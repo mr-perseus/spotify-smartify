@@ -29,7 +29,7 @@ export default function CallbackPage() {
       expiresIn: parseInt(expiresIn, 10),
     });
 
-    navigate('/profile', { replace: true });
+    navigate('/dashboard', { replace: true });
   }, [searchParams, navigate, saveTokens]);
 
   return (
