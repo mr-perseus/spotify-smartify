@@ -17,7 +17,16 @@ async function fetchOrThrow(url: string, accessToken: string): Promise<any> {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (response.status === 401) throw new UnauthorizedError();
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  if (!response.ok) {
+    let message = `Request failed: ${response.status}`;
+    try {
+      const body = await response.json();
+      if (body.message) message = body.message;
+    } catch {
+      // response wasn't JSON, keep the default message
+    }
+    throw new Error(message);
+  }
   return response.json();
 }
 

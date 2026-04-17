@@ -116,10 +116,8 @@ export default function PlaylistPage() {
     } catch (err: any) {
       if (err instanceof UnauthorizedError) {
         logout();
-      } else if (err.message?.includes('404') || err.message?.includes('not_found')) {
-        setLoadError('Playlist not found. Make sure the link is correct and the playlist is public.');
       } else {
-        setLoadError('Could not load the playlist. Please try again.');
+        setLoadError(err.message || 'Could not load the playlist. Please try again.');
       }
     } finally {
       setLoading(false);
