@@ -13,6 +13,7 @@ The application requires the following environment variables to be set before st
 | `SPOTIFY_REDIRECT_URI`  | No       | OAuth callback URI. Defaults to `http://127.0.0.1:8080/auth/callback`                         |
 | `ALLOWED_SPOTIFY_IDS`   | No       | Comma-separated list of Spotify user IDs allowed to log in. If not set, all users are allowed |
 | `FRONTEND_URL`          | No       | Base URL of the React frontend. Defaults to `http://127.0.0.1:3000`                           |
+| `PORT`                  | No       | HTTP port the server listens on. Defaults to `8080`. Automatically set by Railway             |
 
 ### Where to find your credentials
 
@@ -92,8 +93,8 @@ All user endpoints require an `Authorization: Bearer <accessToken>` header.
 
 All playlist endpoints require an `Authorization: Bearer <accessToken>` header.
 
-| Method | Path                              | Description                                                                                                                                                                 |
-|--------|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GET`  | `/playlist/{playlistId}/tracks`   | Returns `{ playlistName, tracks }` for the given playlist. `tracks` is a list of up to 500 track objects `{ id, name, artistName, albumName, albumArtUrl, previewUrl }`. Episodes and local files are excluded. |
+| Method | Path                            | Description                                                                                                                                                                                                     |
+|--------|---------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET`  | `/playlist/{playlistId}/tracks` | Returns `{ playlistName, tracks }` for the given playlist. `tracks` is a list of up to 500 track objects `{ id, name, artists, albumName, albumImageUrl, previewUrl, spotifyUrl }`. Episodes and local files are excluded. |
 
 `playlistId` is the Spotify playlist ID (e.g. `37i9dQZF1DXcBWIGoYBM5M`). You can also pass a full Spotify playlist URL or URI — the ID must be extracted client-side before calling this endpoint.
