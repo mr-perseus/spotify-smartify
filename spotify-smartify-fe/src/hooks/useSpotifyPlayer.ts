@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const SPOTIFY_PLAY_URL = 'https://api.spotify.com/v1/me/player/play';
+const SPOTIFY_API_BASE = 'https://api.spotify.com/v1/me/player';
+const PLAY_RETRY_DELAY_MS = 1500;
+const PLAY_MAX_RETRIES = 3;
 
 export interface SpotifyPlayerHandle {
   /** true once the SDK device is registered and ready */
@@ -53,12 +55,14 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
 
       player.addListener('ready', ({ device_id }) => {
         if (!mounted) return;
+        console.log('[SpotifyPlayer] ready, device_id:', device_id);
         deviceIdRef.current = device_id;
         setIsReady(true);
       });
 
       player.addListener('not_ready', () => {
         if (!mounted) return;
+        console.log('[SpotifyPlayer] not_ready');
         deviceIdRef.current = null;
         setIsReady(false);
       });
@@ -87,7 +91,14 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
         console.warn('[SpotifyPlayer] playback error:', message);
       });
 
-      player.connect();
+      // activateElement pre-warms the audio element so browsers allow playback.
+      // Must be called before connect().
+      player.activateElement();
+      player.connect().then((success) => {
+        if (!success) {
+          console.warn('[SpotifyPlayer] connect() returned false');
+        }
+      });
       playerRef.current = player;
     }
 
@@ -111,29 +122,52 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps — getTokenRef handles staleness
 
+  /**
+   * Calls PUT /me/player/play. Retries on 404 (device not yet propagated)
+   * up to PLAY_MAX_RETRIES times with PLAY_RETRY_DELAY_MS between attempts.
+   */
   const play = useCallback(async (trackId: string): Promise<boolean> => {
     const deviceId = deviceIdRef.current;
     const token = getTokenRef.current();
     if (!deviceId || !token) return false;
 
-    try {
-      const response = await fetch(`${SPOTIFY_PLAY_URL}?device_id=${deviceId}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ uris: [`spotify:track:${trackId}`] }),
-      });
+    for (let attempt = 0; attempt <= PLAY_MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, PLAY_RETRY_DELAY_MS));
+      }
 
-      if (response.status === 401 || response.status === 403) {
-        // Token expired or no permission — fall back to preview
+      try {
+        const response = await fetch(`${SPOTIFY_API_BASE}/play?device_id=${deviceId}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ uris: [`spotify:track:${trackId}`] }),
+        });
+
+        if (response.ok || response.status === 204) {
+          return true;
+        }
+
+        if (response.status === 404 && attempt < PLAY_MAX_RETRIES) {
+          console.log(`[SpotifyPlayer] device not found, retry ${attempt + 1}/${PLAY_MAX_RETRIES}...`);
+          continue;
+        }
+
+        if (response.status === 401 || response.status === 403) {
+          return false;
+        }
+
+        // Any other error — don't retry
+        console.warn('[SpotifyPlayer] play failed:', response.status);
+        return false;
+      } catch {
         return false;
       }
-      return response.ok || response.status === 204;
-    } catch {
-      return false;
     }
+
+    return false;
   }, []);
 
   const pause = useCallback(async () => {
