@@ -18,8 +18,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleForbiddenException(ForbiddenException ex) {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(Map.of("error", "forbidden", "message",
-                        "Access denied — you may need to log out and log back in to grant playlist permissions."));
+                .body(Map.of("error", "forbidden", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(NotFoundException.class)
