@@ -1,0 +1,41 @@
+# Render Blueprint – https://docs.render.com/blueprint-spec
+# Connect this repo in the Render dashboard and it will auto-detect this file.
+
+services:
+  # ── Backend (Spring Boot) ──────────────────────────────────────────
+  - type: web
+    name: spotify-smartify-be
+    runtime: java
+    rootDir: spotify-smartify-be
+    buildCommand: ./mvnw -DskipTests clean package
+    startCommand: java -jar target/*.jar
+    envVars:
+      - key: SPOTIFY_CLIENT_ID
+        sync: false          # must be set manually in the dashboard
+      - key: SPOTIFY_CLIENT_SECRET
+        sync: false
+      - key: SPOTIFY_REDIRECT_URI
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: ALLOWED_SPOTIFY_IDS
+        sync: false
+
+  # ── Frontend (React SPA) ───────────────────────────────────────────
+  - type: web
+    name: spotify-smartify-fe
+    runtime: static
+    rootDir: spotify-smartify-fe
+    buildCommand: npm install && npm run build
+    staticPublishPath: build
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_BASE_URL
+        sync: false          # must be set manually in the dashboard
