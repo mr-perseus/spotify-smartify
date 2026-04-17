@@ -46,4 +46,12 @@ public class AuthService {
             throw new RuntimeException("Failed to exchange Spotify authorization code", e);
         }
     }
+
+    /**
+     * Clears stored tokens from the SpotifyApi instance, e.g. after a failed whitelist check.
+     */
+    public void clearTokens() {
+        spotifyApi.setAccessToken(null);
+        spotifyApi.setRefreshToken(null);
+    }
 }

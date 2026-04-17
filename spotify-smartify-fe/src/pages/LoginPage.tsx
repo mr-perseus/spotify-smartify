@@ -1,10 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { authApi } from '../services/authApi';
 import './LoginPage.css';
 
+const ERROR_MESSAGES: Record<string, string> = {
+  access_denied: 'Your Spotify account is not authorised to access this app.',
+  exchange_failed: 'Authentication failed. Please try again.',
+  missing_code: 'No authorisation code received from Spotify. Please try again.',
+};
+
 export default function LoginPage() {
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const urlError = searchParams.get('error');
+    if (urlError) {
+      setError(ERROR_MESSAGES[urlError] ?? `Login failed: ${urlError}`);
+    }
+  }, [searchParams]);
 
   const handleLogin = async () => {
     setLoading(true);

@@ -9,3 +9,4 @@ spotify:
 
 app:
   frontend-url: ${FRONTEND_URL:http://127.0.0.1:3000}
+  allowed-spotify-ids: ${ALLOWED_SPOTIFY_IDS:}
