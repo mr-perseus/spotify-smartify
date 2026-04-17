@@ -70,7 +70,9 @@ export default function PlaylistPage() {
   const [playlistName, setPlaylistName] = useState('');
   const [tracks, setTracks] = useState<TopTrack[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [revealed, setRevealed] = useState(false);
+  const [artRevealed, setArtRevealed] = useState(false);
+  const [titleRevealed, setTitleRevealed] = useState(false);
+  const [artistRevealed, setArtistRevealed] = useState(false);
 
   // Audio state
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('none');
@@ -166,7 +168,9 @@ export default function PlaylistPage() {
       setPlaylistName(result.playlistName);
       setTracks(s);
       setCurrentIndex(0);
-      setRevealed(false);
+      setArtRevealed(false);
+      setTitleRevealed(false);
+      setArtistRevealed(false);
       playTrack(s[0]);
     } catch (err: any) {
       if (err instanceof UnauthorizedError) {
@@ -179,10 +183,16 @@ export default function PlaylistPage() {
     }
   };
 
+  const resetReveals = () => {
+    setArtRevealed(false);
+    setTitleRevealed(false);
+    setArtistRevealed(false);
+  };
+
   const goToIndex = async (index: number) => {
     const track = tracks[index];
     setCurrentIndex(index);
-    setRevealed(false);
+    resetReveals();
     playTrack(track);
   };
 
@@ -190,7 +200,7 @@ export default function PlaylistPage() {
     const s = shuffled(tracks);
     setTracks(s);
     setCurrentIndex(0);
-    setRevealed(false);
+    resetReveals();
     playTrack(s[0]);
   };
 
@@ -278,39 +288,63 @@ export default function PlaylistPage() {
 
         {/* Album art */}
         <div className="game-art-wrap">
-          {currentTrack.albumImageUrl ? (
-            <img
-              key={currentTrack.id}
-              className="game-art"
-              src={currentTrack.albumImageUrl}
-              alt=""
-            />
-          ) : (
-            <div className="game-art-placeholder">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48" opacity="0.3">
-                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-              </svg>
-            </div>
-          )}
+          <div className="game-art-container">
+            {currentTrack.albumImageUrl ? (
+              <img
+                key={currentTrack.id}
+                className={`game-art${artRevealed ? '' : ' blurred'}`}
+                src={currentTrack.albumImageUrl}
+                alt=""
+              />
+            ) : (
+              <div className="game-art-placeholder">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48" opacity="0.3">
+                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                </svg>
+              </div>
+            )}
+            <button
+              className={`game-art-eye-btn${artRevealed ? ' active' : ''}`}
+              type="button"
+              onClick={() => setArtRevealed(r => !r)}
+              title={artRevealed ? 'Hide album art' : 'Reveal album art'}
+            >
+              {artRevealed ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          </div>
         </div>
 
-        {/* Hidden / revealed info */}
+        {/* Title row */}
         <div className="game-info-row">
           <div className="game-info-text">
-            <p className={`game-track-name${revealed ? '' : ' blurred'}`}>
+            <p className={`game-track-name${titleRevealed ? '' : ' blurred'}`}>
               {currentTrack.name}
             </p>
-            <p className={`game-track-artist${revealed ? '' : ' blurred'}`}>
+          </div>
+          <button
+            className={`game-eye-btn${titleRevealed ? ' active' : ''}`}
+            type="button"
+            onClick={() => setTitleRevealed(r => !r)}
+            title={titleRevealed ? 'Hide title' : 'Reveal title'}
+          >
+            {titleRevealed ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
+        </div>
+
+        {/* Artist row */}
+        <div className="game-info-row">
+          <div className="game-info-text">
+            <p className={`game-track-artist${artistRevealed ? '' : ' blurred'}`}>
               {currentTrack.artists}
             </p>
           </div>
           <button
-            className={`game-eye-btn${revealed ? ' active' : ''}`}
+            className={`game-eye-btn${artistRevealed ? ' active' : ''}`}
             type="button"
-            onClick={() => setRevealed(r => !r)}
-            title={revealed ? 'Hide info' : 'Reveal title and artist'}
+            onClick={() => setArtistRevealed(r => !r)}
+            title={artistRevealed ? 'Hide artist' : 'Reveal artist'}
           >
-            {revealed ? <EyeOffIcon /> : <EyeIcon />}
+            {artistRevealed ? <EyeOffIcon /> : <EyeIcon />}
           </button>
         </div>
 

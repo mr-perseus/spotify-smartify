@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1/me/player';
-const PLAY_RETRY_DELAY_MS = 1500;
-const PLAY_MAX_RETRIES = 3;
 
 export interface SpotifyPlayerHandle {
   /** true once the SDK device is registered and ready */
@@ -33,6 +31,7 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
   const [isPlaying, setIsPlaying] = useState(false);
   const playerRef = useRef<Spotify.Player | null>(null);
   const deviceIdRef = useRef<string | null>(null);
+  const deviceActivatedRef = useRef(false);
   const getTokenRef = useRef(getAccessToken);
 
   // Always keep the token getter current
@@ -57,13 +56,27 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
         if (!mounted) return;
         console.log('[SpotifyPlayer] ready, device_id:', device_id);
         deviceIdRef.current = device_id;
+        deviceActivatedRef.current = false;
         setIsReady(true);
+
+        // Proactively transfer playback to register the device with Spotify's API.
+        // play: false keeps it silent — just makes the device "known".
+        const token = getTokenRef.current();
+        if (token) {
+          transferPlayback(device_id, token).then((ok) => {
+            if (ok) {
+              console.log('[SpotifyPlayer] device activated via transfer');
+              deviceActivatedRef.current = true;
+            }
+          });
+        }
       });
 
       player.addListener('not_ready', () => {
         if (!mounted) return;
         console.log('[SpotifyPlayer] not_ready');
         deviceIdRef.current = null;
+        deviceActivatedRef.current = false;
         setIsReady(false);
       });
 
@@ -92,7 +105,6 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
       });
 
       // activateElement pre-warms the audio element so browsers allow playback.
-      // Must be called before connect().
       player.activateElement();
       player.connect().then((success) => {
         if (!success) {
@@ -106,7 +118,6 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
     if (window.Spotify?.Player) {
       initPlayer();
     } else {
-      // Wait for the SDK script to load
       window.onSpotifyWebPlaybackSDKReady = () => {
         if (mounted) initPlayer();
       };
@@ -119,25 +130,49 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
         playerRef.current = null;
       }
       deviceIdRef.current = null;
+      deviceActivatedRef.current = false;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — getTokenRef handles staleness
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /**
-   * Calls PUT /me/player/play. Retries on 404 (device not yet propagated)
-   * up to PLAY_MAX_RETRIES times with PLAY_RETRY_DELAY_MS between attempts.
-   */
   const play = useCallback(async (trackId: string): Promise<boolean> => {
     const deviceId = deviceIdRef.current;
     const token = getTokenRef.current();
     if (!deviceId || !token) return false;
 
-    for (let attempt = 0; attempt <= PLAY_MAX_RETRIES; attempt++) {
-      if (attempt > 0) {
-        await new Promise((r) => setTimeout(r, PLAY_RETRY_DELAY_MS));
+    // If the device was never activated, transfer first
+    if (!deviceActivatedRef.current) {
+      const transferred = await transferPlayback(deviceId, token);
+      if (transferred) {
+        deviceActivatedRef.current = true;
+        // Give Spotify a moment to propagate
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+
+    try {
+      const response = await fetch(`${SPOTIFY_API_BASE}/play?device_id=${deviceId}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ uris: [`spotify:track:${trackId}`] }),
+      });
+
+      if (response.ok || response.status === 204) {
+        return true;
       }
 
-      try {
-        const response = await fetch(`${SPOTIFY_API_BASE}/play?device_id=${deviceId}`, {
+      // If still 404, try one more transfer + play
+      if (response.status === 404) {
+        console.log('[SpotifyPlayer] device not found, re-transferring...');
+        const transferred = await transferPlayback(deviceId, token);
+        if (!transferred) return false;
+        deviceActivatedRef.current = true;
+
+        await new Promise((r) => setTimeout(r, 1000));
+
+        const retry = await fetch(`${SPOTIFY_API_BASE}/play?device_id=${deviceId}`, {
           method: 'PUT',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -145,29 +180,18 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
           },
           body: JSON.stringify({ uris: [`spotify:track:${trackId}`] }),
         });
+        return retry.ok || retry.status === 204;
+      }
 
-        if (response.ok || response.status === 204) {
-          return true;
-        }
-
-        if (response.status === 404 && attempt < PLAY_MAX_RETRIES) {
-          console.log(`[SpotifyPlayer] device not found, retry ${attempt + 1}/${PLAY_MAX_RETRIES}...`);
-          continue;
-        }
-
-        if (response.status === 401 || response.status === 403) {
-          return false;
-        }
-
-        // Any other error — don't retry
-        console.warn('[SpotifyPlayer] play failed:', response.status);
-        return false;
-      } catch {
+      if (response.status === 401 || response.status === 403) {
         return false;
       }
-    }
 
-    return false;
+      console.warn('[SpotifyPlayer] play failed:', response.status);
+      return false;
+    } catch {
+      return false;
+    }
   }, []);
 
   const pause = useCallback(async () => {
@@ -182,9 +206,30 @@ export function useSpotifyPlayer(getAccessToken: () => string | null): SpotifyPl
     playerRef.current?.disconnect();
     playerRef.current = null;
     deviceIdRef.current = null;
+    deviceActivatedRef.current = false;
     setIsReady(false);
     setIsPlaying(false);
   }, []);
 
   return { isReady, isPlaying, play, pause, resume, disconnect };
+}
+
+/**
+ * Transfers playback to our SDK device so Spotify's API recognizes it.
+ * `play: false` keeps it silent.
+ */
+async function transferPlayback(deviceId: string, token: string): Promise<boolean> {
+  try {
+    const response = await fetch(SPOTIFY_API_BASE, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ device_ids: [deviceId], play: false }),
+    });
+    return response.ok || response.status === 204;
+  } catch {
+    return false;
+  }
 }

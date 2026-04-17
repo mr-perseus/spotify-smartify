@@ -164,12 +164,22 @@
   justify-content: center;
 }
 
+.game-art-container {
+  position: relative;
+  display: inline-block;
+}
+
 .game-art {
   width: 260px;
   height: 260px;
   border-radius: 8px;
   object-fit: cover;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  transition: filter 0.25s ease;
+}
+
+.game-art.blurred {
+  filter: blur(30px) brightness(0.7);
 }
 
 .game-art-placeholder {
@@ -180,6 +190,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.game-art-eye-btn {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: #b3b3b3;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.game-art-eye-btn:hover {
+  border-color: #fff;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.game-art-eye-btn.active {
+  background: #1db954;
+  border-color: #1db954;
+  color: #000;
 }
 
 /* ── Game: info row (title + artist + eye button) ────────── */
