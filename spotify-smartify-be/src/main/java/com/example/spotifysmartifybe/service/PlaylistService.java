@@ -37,7 +37,7 @@ public class PlaylistService {
             List<TrackResponse> tracks = fetchPlaylistItems(accessToken, playlistId);
             return new PlaylistResponse(playlistName, tracks);
         } catch (HttpClientErrorException.Forbidden e) {
-            log.info("403 for playlist {} — Dev Mode restricts access to owned/collaborative playlists only", playlistId);
+            log.error("403 Forbidden for playlist {} — Dev Mode restricts access to owned/collaborative playlists only", playlistId, e);
             throw new SpotifyApiException(
                     "This playlist is not accessible. Spotify's Dev Mode only allows access " +
                     "to playlists you own or collaborate on.");
@@ -52,15 +52,18 @@ public class PlaylistService {
                     url, HttpMethod.GET, authEntity(accessToken), SpotifyPlaylistMeta.class);
 
             SpotifyPlaylistMeta body = response.getBody();
-            if (body == null || body.name == null) {
+            if (body == null || body.getName() == null) {
                 throw new SpotifyApiException("Playlist not found");
             }
-            return body.name;
+            return body.getName();
         } catch (HttpClientErrorException.NotFound e) {
+            log.error("Playlist not found: {}", playlistId, e);
             throw new SpotifyApiException("Playlist not found: " + playlistId);
         } catch (HttpClientErrorException.Unauthorized e) {
+            log.error("Access token expired or invalid for playlist: {}", playlistId, e);
             throw new SpotifyApiException("Access token expired or invalid");
         } catch (HttpClientErrorException e) {
+            log.error("Failed to fetch playlist info for {}: {}", playlistId, e.getStatusCode(), e);
             throw new SpotifyApiException("Failed to fetch playlist info: " + e.getStatusCode());
         }
     }
@@ -79,19 +82,25 @@ public class PlaylistService {
                     url, HttpMethod.GET, authEntity(token), SpotifyPagingResponse.class);
 
             SpotifyPagingResponse page = response.getBody();
-            if (page == null || page.items == null) {
+            if (page == null || page.getItems() == null) {
                 break;
             }
 
-            for (SpotifyPlaylistItem playlistItem : page.items) {
-                if (playlistItem.isLocal) continue;
-                SpotifyTrack track = playlistItem.item;
-                if (track == null || !"track".equals(track.type)) continue;
+            for (SpotifyPlaylistItem playlistItem : page.getItems()) {
+                if (playlistItem.isLocal()) {
+                    continue;
+                }
+                SpotifyTrack track = playlistItem.getItem();
+                if (track == null || !"track".equals(track.getType())) {
+                    continue;
+                }
 
                 allTracks.add(toTrackResponse(track));
             }
 
-            if (page.next == null) break;
+            if (page.getNext() == null) {
+                break;
+            }
             offset += PAGE_LIMIT;
         }
 
@@ -99,26 +108,26 @@ public class PlaylistService {
     }
 
     private TrackResponse toTrackResponse(SpotifyTrack track) {
-        String artistNames = (track.artists != null)
-                ? track.artists.stream().map(a -> a.name).collect(Collectors.joining(", "))
+        String artistNames = (track.getArtists() != null)
+                ? track.getArtists().stream().map(SpotifyArtist::getName).collect(Collectors.joining(", "))
                 : "";
 
-        String albumName = (track.album != null) ? track.album.name : "";
+        String albumName = (track.getAlbum() != null) ? track.getAlbum().getName() : "";
 
         String albumImageUrl = "";
-        if (track.album != null && track.album.images != null && !track.album.images.isEmpty()) {
-            albumImageUrl = track.album.images.get(0).url;
+        if (track.getAlbum() != null && track.getAlbum().getImages() != null && !track.getAlbum().getImages().isEmpty()) {
+            albumImageUrl = track.getAlbum().getImages().get(0).getUrl();
         }
 
-        String previewUrl = (track.previewUrl != null) ? track.previewUrl : "";
+        String previewUrl = (track.getPreviewUrl() != null) ? track.getPreviewUrl() : "";
 
         String spotifyUrl = "";
-        if (track.externalUrls != null) {
-            spotifyUrl = track.externalUrls.getOrDefault("spotify", "");
+        if (track.getExternalUrls() != null) {
+            spotifyUrl = track.getExternalUrls().getOrDefault("spotify", "");
         }
 
         return new TrackResponse(
-                track.id, track.name, artistNames, albumName,
+                track.getId(), track.getName(), artistNames, albumName,
                 albumImageUrl, previewUrl, spotifyUrl);
     }
 
@@ -132,52 +141,132 @@ public class PlaylistService {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class SpotifyPlaylistMeta {
-        public String name;
+        @JsonProperty
+        private String name;
+
+        public String getName() {
+            return name;
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class SpotifyPagingResponse {
-        public List<SpotifyPlaylistItem> items;
-        public String next;
-        public int total;
+        @JsonProperty
+        private List<SpotifyPlaylistItem> items;
+        @JsonProperty
+        private String next;
+        @JsonProperty
+        private int total;
+
+        public List<SpotifyPlaylistItem> getItems() {
+            return items;
+        }
+
+        public String getNext() {
+            return next;
+        }
+
+        public int getTotal() {
+            return total;
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class SpotifyPlaylistItem {
         @JsonProperty("is_local")
-        public boolean isLocal;
+        private boolean isLocal;
 
-        // Feb 2026: field renamed from "track" to "item"
         @JsonProperty("item")
-        public SpotifyTrack item;
+        private SpotifyTrack item;
+
+        public boolean isLocal() {
+            return isLocal;
+        }
+
+        public SpotifyTrack getItem() {
+            return item;
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class SpotifyTrack {
-        public String id;
-        public String name;
-        public String type;
-        public List<SpotifyArtist> artists;
-        public SpotifyAlbum album;
+        @JsonProperty
+        private String id;
+        @JsonProperty
+        private String name;
+        @JsonProperty
+        private String type;
+        @JsonProperty
+        private List<SpotifyArtist> artists;
+        @JsonProperty
+        private SpotifyAlbum album;
         @JsonProperty("preview_url")
-        public String previewUrl;
+        private String previewUrl;
         @JsonProperty("external_urls")
-        public Map<String, String> externalUrls;
+        private Map<String, String> externalUrls;
+
+        public String getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public List<SpotifyArtist> getArtists() {
+            return artists;
+        }
+
+        public SpotifyAlbum getAlbum() {
+            return album;
+        }
+
+        public String getPreviewUrl() {
+            return previewUrl;
+        }
+
+        public Map<String, String> getExternalUrls() {
+            return externalUrls;
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class SpotifyArtist {
-        public String name;
+        @JsonProperty
+        private String name;
+
+        public String getName() {
+            return name;
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class SpotifyAlbum {
-        public String name;
-        public List<SpotifyImage> images;
+        @JsonProperty
+        private String name;
+        @JsonProperty
+        private List<SpotifyImage> images;
+
+        public String getName() {
+            return name;
+        }
+
+        public List<SpotifyImage> getImages() {
+            return images;
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class SpotifyImage {
-        public String url;
+        @JsonProperty
+        private String url;
+
+        public String getUrl() {
+            return url;
+        }
     }
 }

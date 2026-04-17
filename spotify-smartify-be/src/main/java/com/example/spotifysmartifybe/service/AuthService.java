@@ -3,6 +3,8 @@ package com.example.spotifysmartifybe.service;
 import com.example.spotifysmartifybe.config.SpotifyApiFactory;
 import com.example.spotifysmartifybe.exception.SpotifyApiException;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import se.michaelthelin.spotify.model_objects.credentials.AuthorizationCodeCredentials;
 
@@ -11,6 +13,8 @@ import java.net.URI;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private static final String SCOPES =
             "user-read-private user-read-email user-top-read " +
@@ -35,6 +39,7 @@ public class AuthService {
                     .build()
                     .execute();
         } catch (Exception e) {
+            log.error("Failed to exchange Spotify authorization code", e);
             throw new SpotifyApiException("Failed to exchange Spotify authorization code", e);
         }
     }
@@ -46,14 +51,11 @@ public class AuthService {
                     .build()
                     .execute();
         } catch (Exception e) {
+            log.error("Failed to refresh access token", e);
             throw new SpotifyApiException("Failed to refresh access token", e);
         }
     }
 
-    /**
-     * Obtains an access token via the Client Credentials flow (no user context).
-     * Useful for accessing public resources that don't require user authorization.
-     */
     public String getClientCredentialsToken() {
         try {
             return spotifyApiFactory.createForAuth()
@@ -62,6 +64,7 @@ public class AuthService {
                     .execute()
                     .getAccessToken();
         } catch (Exception e) {
+            log.error("Failed to obtain client credentials token", e);
             throw new SpotifyApiException("Failed to obtain client credentials token", e);
         }
     }

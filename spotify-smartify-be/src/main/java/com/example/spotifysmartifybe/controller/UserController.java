@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/user")
@@ -22,6 +23,7 @@ import java.util.Set;
 public class UserController {
 
     private static final Set<String> VALID_TIME_RANGES = Set.of("short_term", "medium_term", "long_term");
+    private static final int BEARER_PREFIX_LENGTH = "Bearer ".length();
 
     private final UserService userService;
 
@@ -53,7 +55,7 @@ public class UserController {
                         track.getName(),
                         Arrays.stream(track.getArtists())
                                 .map(ArtistSimplified::getName)
-                                .collect(java.util.stream.Collectors.joining(", ")),
+                                .collect(Collectors.joining(", ")),
                         track.getAlbum().getName(),
                         track.getAlbum().getImages().length > 0
                                 ? track.getAlbum().getImages()[0].getUrl()
@@ -71,6 +73,6 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "Missing or invalid Authorization header");
         }
-        return authHeader.substring(7);
+        return authHeader.substring(BEARER_PREFIX_LENGTH);
     }
 }

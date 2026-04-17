@@ -5,6 +5,8 @@ import com.example.spotifysmartifybe.service.AuthService;
 import com.example.spotifysmartifybe.service.UserService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -21,6 +23,8 @@ import java.util.Map;
 @RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
     private final UserService userService;
@@ -73,6 +77,7 @@ public class AuthController {
                     + "&expiresIn=" + credentials.getExpiresIn());
 
         } catch (Exception e) {
+            log.error("Error during OAuth callback: {}", e.getMessage(), e);
             return redirectToFrontend("/?error=exchange_failed");
         }
     }

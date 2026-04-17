@@ -13,6 +13,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class PlaylistController {
 
+    private static final int BEARER_PREFIX_LENGTH = "Bearer ".length();
+
     private final PlaylistService playlistService;
 
     @GetMapping("/{playlistId}/tracks")
@@ -30,6 +32,6 @@ public class PlaylistController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "Missing or invalid Authorization header");
         }
-        return authHeader.substring(7);
+        return authHeader.substring(BEARER_PREFIX_LENGTH);
     }
 }
