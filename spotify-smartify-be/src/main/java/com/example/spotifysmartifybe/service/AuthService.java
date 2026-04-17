@@ -12,7 +12,9 @@ import java.net.URI;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private static final String SCOPES = "user-read-private user-read-email user-top-read";
+    private static final String SCOPES =
+            "user-read-private user-read-email user-top-read " +
+            "playlist-read-private playlist-read-collaborative";
 
     private final SpotifyApiFactory spotifyApiFactory;
 

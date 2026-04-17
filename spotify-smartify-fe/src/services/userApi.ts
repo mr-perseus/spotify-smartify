@@ -36,6 +36,11 @@ export interface UserProfile {
   email: string;
 }
 
+export interface PlaylistInfo {
+  playlistName: string;
+  tracks: TopTrack[];
+}
+
 export const userApi = {
   getProfile: async (accessToken: string): Promise<UserProfile> => {
     return fetchOrThrow(`${API_BASE_URL}/user/profile`, accessToken);
@@ -43,5 +48,9 @@ export const userApi = {
 
   getTopTracks: async (accessToken: string, timeRange: TimeRange = 'medium_term'): Promise<TopTrack[]> => {
     return fetchOrThrow(`${API_BASE_URL}/user/top-tracks?timeRange=${timeRange}`, accessToken);
+  },
+
+  getPlaylistTracks: async (accessToken: string, playlistId: string): Promise<PlaylistInfo> => {
+    return fetchOrThrow(`${API_BASE_URL}/playlist/${playlistId}/tracks`, accessToken);
   },
 };

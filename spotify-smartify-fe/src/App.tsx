@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import CallbackPage from './pages/CallbackPage';
 import ProfilePage from './pages/ProfilePage';
+import PlaylistPage from './pages/PlaylistPage';
 
 function ProtectedRoute({ children }: { children: React.ReactElement }) {
   const { isAuthenticated } = useAuth();
@@ -25,6 +26,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/playlist"
+        element={
+          <ProtectedRoute>
+            <PlaylistPage />
           </ProtectedRoute>
         }
       />

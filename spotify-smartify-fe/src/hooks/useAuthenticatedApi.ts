@@ -57,5 +57,9 @@ export function useAuthenticatedApi() {
       (timeRange: TimeRange) => withRefresh(token => userApi.getTopTracks(token, timeRange)),
       [withRefresh],
     ),
+    getPlaylistTracks: useCallback(
+      (playlistId: string) => withRefresh(token => userApi.getPlaylistTracks(token, playlistId)),
+      [withRefresh],
+    ),
   };
 }

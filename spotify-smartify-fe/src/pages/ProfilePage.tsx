@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAuthenticatedApi } from '../hooks/useAuthenticatedApi';
 import { TopTrack, TimeRange, TIME_RANGE_LABELS } from '../services/userApi';
@@ -6,6 +7,7 @@ import { UnauthorizedError } from '../services/errors';
 import './ProfilePage.css';
 
 export default function ProfilePage() {
+  const navigate = useNavigate();
   const { logout } = useAuth();
   const api = useAuthenticatedApi();
 
@@ -93,6 +95,9 @@ export default function ProfilePage() {
             </svg>
           </div>
           <h1 className="profile-title">Spotify Smartify</h1>
+          <button className="profile-playlist-btn" onClick={() => navigate('/playlist')}>
+            Play a Playlist
+          </button>
           <button className="profile-logout" onClick={logout}>Log out</button>
         </div>
 
