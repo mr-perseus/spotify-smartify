@@ -10,14 +10,14 @@ The application requires the following environment variables to be set before st
 |-------------------------|----------|-----------------------------------------------------------------------|
 | `SPOTIFY_CLIENT_ID`     | Yes      | Your Spotify application's Client ID                                  |
 | `SPOTIFY_CLIENT_SECRET` | Yes      | Your Spotify application's Client Secret                              |
-| `SPOTIFY_REDIRECT_URI`  | No       | OAuth callback URI. Defaults to `http://localhost:8080/auth/callback` |
+| `SPOTIFY_REDIRECT_URI`  | No       | OAuth callback URI. Defaults to `http://127.0.0.1:8080/auth/callback` |
 
 ### Where to find your credentials
 
 1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Create an app (or open an existing one)
 3. Copy the **Client ID** and **Client Secret** from the app overview page
-4. Under **Edit Settings**, add the redirect URI (e.g. `http://localhost:8080/auth/callback`) to the **Redirect URIs** allowlist
+4. Under **Edit Settings**, add the redirect URI (e.g. `http://127.0.0.1:8080/auth/callback`) to the **Redirect URIs** allowlist
 
 ### Setting environment variables
 
@@ -25,14 +25,14 @@ The application requires the following environment variables to be set before st
 ```bash
 export SPOTIFY_CLIENT_ID=your_client_id_here
 export SPOTIFY_CLIENT_SECRET=your_client_secret_here
-export SPOTIFY_REDIRECT_URI=http://localhost:8080/auth/callback
+export SPOTIFY_REDIRECT_URI=http://127.0.0.1:8080/auth/callback
 ```
 
 **Windows (Command Prompt):**
 ```cmd
 set SPOTIFY_CLIENT_ID=your_client_id_here
 set SPOTIFY_CLIENT_SECRET=your_client_secret_here
-set SPOTIFY_REDIRECT_URI=http://localhost:8080/auth/callback
+set SPOTIFY_REDIRECT_URI=http://127.0.0.1:8080/auth/callback
 ```
 
 **IntelliJ IDEA:**  
@@ -47,7 +47,7 @@ The application does not load `.env` files by default. Use one of the methods ab
 ./mvnw spring-boot:run
 ```
 
-The server starts on `http://localhost:8080`.
+The server starts on `http://127.0.0.1:8080`.
 
 ## API Endpoints
 

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import CallbackPage from './pages/CallbackPage';
 import HomePage from './pages/HomePage';
+import ProfilePage from './pages/ProfilePage';
 
 function ProtectedRoute({ children }: { children: React.ReactElement }) {
   const { isAuthenticated } = useAuth();
@@ -17,9 +18,17 @@ function AppRoutes() {
     <Routes>
       <Route
         path="/"
-        element={isAuthenticated ? <Navigate to="/home" replace /> : <LoginPage />}
+        element={isAuthenticated ? <Navigate to="/profile" replace /> : <LoginPage />}
       />
       <Route path="/callback" element={<CallbackPage />} />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/home"
         element={

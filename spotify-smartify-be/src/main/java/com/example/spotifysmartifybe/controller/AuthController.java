@@ -2,6 +2,9 @@ package com.example.spotifysmartifybe.controller;
 
 import com.example.spotifysmartifybe.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +22,9 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @Value("${spotify.redirect-uri}")
+    private String spotifyRedirectUri;
+
     /**
      * GET /auth/login
      * Returns the Spotify authorization URL the client should redirect the user to.
@@ -30,26 +36,38 @@ public class AuthController {
     }
 
     /**
-     * GET /auth/callback?code=...&state=...
-     * Spotify redirects here after the user grants (or denies) access.
-     * Exchanges the authorization code for access + refresh tokens and returns them.
+     * GET /auth/callback?code=...
+     * Spotify redirects the browser here. Exchanges the code for tokens, then
+     * performs a browser redirect to the React frontend /callback route.
+     * The frontend URL is derived from spotify.redirect-uri by replacing the path.
      */
     @GetMapping("/callback")
-    public ResponseEntity<?> callback(
+    public ResponseEntity<Void> callback(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String error) {
 
+        URI redirectUri = URI.create(spotifyRedirectUri);
+        String frontendBase = redirectUri.getScheme() + "://" + redirectUri.getAuthority();
+
+        HttpHeaders headers = new HttpHeaders();
+
         if (error != null || code == null) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", error != null ? error : "Missing authorization code"));
+            String reason = error != null ? error : "missing_code";
+            headers.setLocation(URI.create(frontendBase + "/callback?error=" + reason));
+            return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
         }
 
-        AuthorizationCodeCredentials credentials = authService.exchangeCode(code);
+        try {
+            AuthorizationCodeCredentials credentials = authService.exchangeCode(code);
+            String location = frontendBase + "/callback"
+                    + "?accessToken=" + credentials.getAccessToken()
+                    + "&refreshToken=" + credentials.getRefreshToken()
+                    + "&expiresIn=" + credentials.getExpiresIn();
+            headers.setLocation(URI.create(location));
+        } catch (Exception e) {
+            headers.setLocation(URI.create(frontendBase + "/callback?error=exchange_failed"));
+        }
 
-        return ResponseEntity.ok(Map.of(
-                "accessToken", credentials.getAccessToken(),
-                "refreshToken", credentials.getRefreshToken(),
-                "expiresIn", credentials.getExpiresIn()
-        ));
+        return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
     }
 }

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { authApi } from '../services/authApi';
 import { useAuth } from '../context/AuthContext';
 import './CallbackPage.css';
 
@@ -14,22 +13,23 @@ export default function CallbackPage() {
     if (handled.current) return;
     handled.current = true;
 
-    const code = searchParams.get('code');
     const error = searchParams.get('error');
+    const accessToken = searchParams.get('accessToken');
+    const refreshToken = searchParams.get('refreshToken');
+    const expiresIn = searchParams.get('expiresIn');
 
-    if (error || !code) {
-      navigate(`/?error=${encodeURIComponent(error || 'missing_code')}`, { replace: true });
+    if (error || !accessToken || !refreshToken || !expiresIn) {
+      navigate(`/?error=${encodeURIComponent(error || 'missing_tokens')}`, { replace: true });
       return;
     }
 
-    authApi.exchangeCode(code)
-      .then((tokens) => {
-        saveTokens(tokens);
-        navigate('/home', { replace: true });
-      })
-      .catch((e: Error) => {
-        navigate(`/?error=${encodeURIComponent(e.message)}`, { replace: true });
-      });
+    saveTokens({
+      accessToken,
+      refreshToken,
+      expiresIn: parseInt(expiresIn, 10),
+    });
+
+    navigate('/profile', { replace: true });
   }, [searchParams, navigate, saveTokens]);
 
   return (
