@@ -5,10 +5,8 @@ services:
   # ── Backend (Spring Boot) ──────────────────────────────────────────
   - type: web
     name: spotify-smartify-be
-    runtime: java
+    runtime: docker
     rootDir: spotify-smartify-be
-    buildCommand: ./mvnw -DskipTests clean package
-    startCommand: java -jar target/*.jar
     envVars:
       - key: SPOTIFY_CLIENT_ID
         sync: false          # must be set manually in the dashboard
