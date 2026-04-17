@@ -254,6 +254,8 @@
 .game-play-row {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 10px;
 }
 
 .game-play-btn {
@@ -348,4 +350,38 @@
   color: #1db954;
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+/* ── SDK status badge (header) ──────────────────────────── */
+.pl-sdk-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 50px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.pl-sdk-badge.ready {
+  background: rgba(29, 185, 84, 0.15);
+  color: #1db954;
+}
+
+.pl-sdk-badge.not-ready {
+  background: rgba(179, 179, 179, 0.1);
+  color: #777;
+}
+
+/* ── Playback mode badge (next to play button) ──────────── */
+.game-playback-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 50px;
+  background: rgba(29, 185, 84, 0.15);
+  color: #1db954;
 }

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAuthenticatedApi } from '../hooks/useAuthenticatedApi';
+import { useSpotifyPlayer } from '../hooks/useSpotifyPlayer';
 import { TopTrack } from '../services/userApi';
 import { UnauthorizedError } from '../services/errors';
 import './PlaylistPage.css';
@@ -47,10 +48,18 @@ const EyeOffIcon = () => (
   </svg>
 );
 
+/** Which audio source is currently active */
+type PlaybackMode = 'spotify' | 'preview' | 'none';
+
 export default function PlaylistPage() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { tokens, logout } = useAuth();
   const api = useAuthenticatedApi();
+
+  // Spotify Web Playback SDK
+  const spotify = useSpotifyPlayer(
+    useCallback(() => tokens?.accessToken ?? null, [tokens]),
+  );
 
   // Input phase
   const [urlInput, setUrlInput] = useState('');
@@ -62,34 +71,80 @@ export default function PlaylistPage() {
   const [tracks, setTracks] = useState<TopTrack[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Audio state
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('none');
+  const [previewPlaying, setPreviewPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Stop audio on unmount
-  useEffect(() => () => { audioRef.current?.pause(); }, []);
+  // Derived: "is anything playing?"
+  const isPlaying = playbackMode === 'spotify' ? spotify.isPlaying : previewPlaying;
 
-  const stopAudio = useCallback(() => {
+  // Stop preview audio
+  const stopPreview = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.onended = null;
       audioRef.current = null;
     }
-    setIsPlaying(false);
+    setPreviewPlaying(false);
   }, []);
 
-  const playTrack = useCallback((track: TopTrack) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.onended = null;
-      audioRef.current = null;
+  // Stop ALL audio (SDK + preview)
+  const stopAll = useCallback(async () => {
+    stopPreview();
+    if (spotify.isPlaying) {
+      await spotify.pause();
     }
-    setIsPlaying(false);
-    if (!track.previewUrl) return;
+    setPlaybackMode('none');
+  }, [stopPreview, spotify]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    audioRef.current?.pause();
+    spotify.disconnect();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Play a track. Tries Spotify SDK first, falls back to 30s preview.
+   */
+  const playTrack = useCallback(async (track: TopTrack) => {
+    // Stop whatever was playing before
+    stopPreview();
+    if (spotify.isPlaying) {
+      await spotify.pause();
+    }
+
+    // Try full Spotify playback
+    if (spotify.isReady && track.id) {
+      const started = await spotify.play(track.id);
+      if (started) {
+        setPlaybackMode('spotify');
+        return;
+      }
+    }
+
+    // Fallback: 30s preview
+    if (!track.previewUrl) {
+      setPlaybackMode('none');
+      return;
+    }
     const audio = new Audio(track.previewUrl);
     audioRef.current = audio;
-    audio.onended = () => setIsPlaying(false);
-    audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-  }, []);
+    audio.onended = () => {
+      setPreviewPlaying(false);
+      setPlaybackMode('none');
+    };
+    audio.play()
+      .then(() => {
+        setPreviewPlaying(true);
+        setPlaybackMode('preview');
+      })
+      .catch(() => {
+        setPreviewPlaying(false);
+        setPlaybackMode('none');
+      });
+  }, [spotify, stopPreview]);
 
   const handleLoad = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +153,7 @@ export default function PlaylistPage() {
       setLoadError('Could not find a playlist ID. Paste a Spotify playlist URL or URI.');
       return;
     }
-    stopAudio();
+    await stopAll();
     setLoading(true);
     setLoadError(null);
     try {
@@ -124,14 +179,14 @@ export default function PlaylistPage() {
     }
   };
 
-  const goToIndex = (index: number) => {
+  const goToIndex = async (index: number) => {
     const track = tracks[index];
     setCurrentIndex(index);
     setRevealed(false);
     playTrack(track);
   };
 
-  const handleShuffle = () => {
+  const handleShuffle = async () => {
     const s = shuffled(tracks);
     setTracks(s);
     setCurrentIndex(0);
@@ -139,19 +194,33 @@ export default function PlaylistPage() {
     playTrack(s[0]);
   };
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const track = tracks[currentIndex];
-    if (!track?.previewUrl) return;
+    if (!track) return;
+
     if (isPlaying) {
-      stopAudio();
+      // Pause whatever is playing
+      if (playbackMode === 'spotify') {
+        await spotify.pause();
+      } else {
+        stopPreview();
+        setPlaybackMode('none');
+      }
     } else {
-      playTrack(track);
+      // Resume or start
+      if (playbackMode === 'spotify') {
+        await spotify.resume();
+      } else {
+        // Start fresh playback
+        playTrack(track);
+      }
     }
   };
 
   const currentTrack = tracks[currentIndex];
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === tracks.length - 1;
+  const hasAudio = spotify.isReady || !!currentTrack?.previewUrl;
 
   // ── Input phase ──────────────────────────────────────────────────────────
   if (tracks.length === 0) {
@@ -161,6 +230,7 @@ export default function PlaylistPage() {
           <Header
             onBack={() => navigate('/profile')}
             onLogout={logout}
+            sdkReady={spotify.isReady}
           />
           <form className="pl-form" onSubmit={handleLoad}>
             <label className="pl-label" htmlFor="pl-url">
@@ -171,7 +241,7 @@ export default function PlaylistPage() {
                 id="pl-url"
                 type="text"
                 className="pl-input"
-                placeholder="https://open.spotify.com/playlist/…"
+                placeholder="https://open.spotify.com/playlist/..."
                 value={urlInput}
                 onChange={e => setUrlInput(e.target.value)}
                 disabled={loading}
@@ -181,7 +251,7 @@ export default function PlaylistPage() {
                 className="pl-load-btn"
                 disabled={!urlInput.trim() || loading}
               >
-                {loading ? 'Loading…' : 'Load'}
+                {loading ? 'Loading...' : 'Load'}
               </button>
             </div>
             {loadError && <p className="pl-error">{loadError}</p>}
@@ -197,8 +267,9 @@ export default function PlaylistPage() {
       <div className="playlist-card">
         <Header
           subtitle={playlistName}
-          onBack={() => { stopAudio(); navigate('/profile'); }}
+          onBack={async () => { await stopAll(); navigate('/profile'); }}
           onLogout={logout}
+          sdkReady={spotify.isReady}
         />
 
         <p className="game-counter">
@@ -243,33 +314,40 @@ export default function PlaylistPage() {
           </button>
         </div>
 
-        {/* Play / pause preview */}
+        {/* Play / pause */}
         <div className="game-play-row">
-          {currentTrack.previewUrl ? (
-            <button
-              className={`game-play-btn${isPlaying ? ' playing' : ''}`}
-              type="button"
-              onClick={togglePlay}
-            >
-              {isPlaying ? (
-                <>
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
-                    <rect x="6" y="4" width="4" height="16" rx="1" />
-                    <rect x="14" y="4" width="4" height="16" rx="1" />
-                  </svg>
-                  Pause
-                </>
-              ) : (
-                <>
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                  Play preview
-                </>
+          {hasAudio ? (
+            <>
+              <button
+                className={`game-play-btn${isPlaying ? ' playing' : ''}`}
+                type="button"
+                onClick={togglePlay}
+              >
+                {isPlaying ? (
+                  <>
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+                      <rect x="6" y="4" width="4" height="16" rx="1" />
+                      <rect x="14" y="4" width="4" height="16" rx="1" />
+                    </svg>
+                    Pause
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    Play
+                  </>
+                )}
+              </button>
+              {playbackMode !== 'none' && (
+                <span className="game-playback-badge">
+                  {playbackMode === 'spotify' ? 'Spotify' : 'Preview'}
+                </span>
               )}
-            </button>
+            </>
           ) : (
-            <p className="game-no-preview">No preview available</p>
+            <p className="game-no-preview">No audio available</p>
           )}
         </div>
 
@@ -281,7 +359,7 @@ export default function PlaylistPage() {
             disabled={isFirst}
             onClick={() => goToIndex(currentIndex - 1)}
           >
-            ← Prev
+            Prev
           </button>
           <button
             className="game-shuffle-btn"
@@ -297,7 +375,7 @@ export default function PlaylistPage() {
             disabled={isLast}
             onClick={() => goToIndex(currentIndex + 1)}
           >
-            Next →
+            Next
           </button>
         </div>
 
@@ -315,10 +393,12 @@ function Header({
   subtitle,
   onBack,
   onLogout,
+  sdkReady,
 }: {
   subtitle?: string;
   onBack: () => void;
   onLogout: () => void;
+  sdkReady: boolean;
 }) {
   return (
     <div className="pl-header">
@@ -327,7 +407,10 @@ function Header({
         <h1 className="pl-title">Playlist Quiz</h1>
         {subtitle && <p className="pl-subtitle">{subtitle}</p>}
       </div>
-      <button className="pl-back-btn" onClick={onBack}>← Top tracks</button>
+      <span className={`pl-sdk-badge ${sdkReady ? 'ready' : 'not-ready'}`}>
+        {sdkReady ? 'Full playback' : 'Preview only'}
+      </span>
+      <button className="pl-back-btn" onClick={onBack}>Top tracks</button>
       <button className="pl-logout-btn" onClick={onLogout}>Log out</button>
     </div>
   );

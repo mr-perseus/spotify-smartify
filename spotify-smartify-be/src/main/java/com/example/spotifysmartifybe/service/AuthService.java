@@ -14,7 +14,8 @@ public class AuthService {
 
     private static final String SCOPES =
             "user-read-private user-read-email user-top-read " +
-            "playlist-read-private playlist-read-collaborative";
+            "playlist-read-private playlist-read-collaborative " +
+            "streaming user-modify-playback-state";
 
     private final SpotifyApiFactory spotifyApiFactory;
 
