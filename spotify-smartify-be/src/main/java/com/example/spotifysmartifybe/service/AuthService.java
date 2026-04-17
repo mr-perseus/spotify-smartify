@@ -1,9 +1,9 @@
 package com.example.spotifysmartifybe.service;
 
+import com.example.spotifysmartifybe.config.SpotifyApiFactory;
+import com.example.spotifysmartifybe.exception.SpotifyApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import se.michaelthelin.spotify.SpotifyApi;
-import se.michaelthelin.spotify.exceptions.detailed.UnauthorizedException;
 import se.michaelthelin.spotify.model_objects.credentials.AuthorizationCodeCredentials;
 
 import java.net.URI;
@@ -14,10 +14,11 @@ public class AuthService {
 
     private static final String SCOPES = "user-read-private user-read-email user-top-read";
 
-    private final SpotifyApi spotifyApi;
+    private final SpotifyApiFactory spotifyApiFactory;
 
     public URI getAuthorizationUri() {
-        return spotifyApi.authorizationCodeUri()
+        return spotifyApiFactory.createForAuth()
+                .authorizationCodeUri()
                 .scope(SCOPES)
                 .show_dialog(true)
                 .build()
@@ -26,19 +27,23 @@ public class AuthService {
 
     public AuthorizationCodeCredentials exchangeCode(String code) {
         try {
-            AuthorizationCodeCredentials credentials = spotifyApi.authorizationCode(code)
+            return spotifyApiFactory.createForAuth()
+                    .authorizationCode(code)
                     .build()
                     .execute();
-            spotifyApi.setAccessToken(credentials.getAccessToken());
-            spotifyApi.setRefreshToken(credentials.getRefreshToken());
-            return credentials;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to exchange Spotify authorization code", e);
+            throw new SpotifyApiException("Failed to exchange Spotify authorization code", e);
         }
     }
 
-    public void clearTokens() {
-        spotifyApi.setAccessToken(null);
-        spotifyApi.setRefreshToken(null);
+    public AuthorizationCodeCredentials refreshAccessToken(String refreshToken) {
+        try {
+            return spotifyApiFactory.createWithRefreshToken(refreshToken)
+                    .authorizationCodeRefresh()
+                    .build()
+                    .execute();
+        } catch (Exception e) {
+            throw new SpotifyApiException("Failed to refresh access token", e);
+        }
     }
 }

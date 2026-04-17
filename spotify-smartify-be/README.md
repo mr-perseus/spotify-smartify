@@ -6,13 +6,13 @@ Spring Boot backend for Spotify Smartify. Implements the Spotify Authorization C
 
 The application requires the following environment variables to be set before starting:
 
-| Variable                | Required | Description                                                           |
-|-------------------------|----------|-----------------------------------------------------------------------|
-| `SPOTIFY_CLIENT_ID`     | Yes      | Your Spotify application's Client ID                                  |
-| `SPOTIFY_CLIENT_SECRET` | Yes      | Your Spotify application's Client Secret                              |
-| `SPOTIFY_REDIRECT_URI`  | No       | OAuth callback URI. Defaults to `http://127.0.0.1:8080/auth/callback` |
+| Variable                | Required | Description                                                                                   |
+|-------------------------|----------|-----------------------------------------------------------------------------------------------|
+| `SPOTIFY_CLIENT_ID`     | Yes      | Your Spotify application's Client ID                                                          |
+| `SPOTIFY_CLIENT_SECRET` | Yes      | Your Spotify application's Client Secret                                                      |
+| `SPOTIFY_REDIRECT_URI`  | No       | OAuth callback URI. Defaults to `http://127.0.0.1:8080/auth/callback`                         |
 | `ALLOWED_SPOTIFY_IDS`   | No       | Comma-separated list of Spotify user IDs allowed to log in. If not set, all users are allowed |
-| `FRONTEND_URL`          | No       | Base URL of the React frontend. Defaults to `http://127.0.0.1:3000`  |
+| `FRONTEND_URL`          | No       | Base URL of the React frontend. Defaults to `http://127.0.0.1:3000`                           |
 
 ### Where to find your credentials
 
@@ -71,7 +71,19 @@ The server starts on `http://127.0.0.1:8080`.
 
 ## API Endpoints
 
-| Method | Path                         | Description                                                    |
-|--------|------------------------------|----------------------------------------------------------------|
-| `GET`  | `/auth/login`                | Returns the Spotify authorization URL to redirect the user to  |
-| `GET`  | `/auth/callback?code=<code>` | Exchanges the authorization code for access and refresh tokens |
+### Auth endpoints
+
+| Method | Path                         | Auth required | Description                                                                                     |
+|--------|------------------------------|---------------|-------------------------------------------------------------------------------------------------|
+| `GET`  | `/auth/login`                | No            | Returns `{ authorizationUrl }` — the Spotify OAuth URL to redirect the user to                  |
+| `GET`  | `/auth/callback?code=<code>` | No            | Exchanges the code, optionally checks the allowlist, then redirects the browser to the frontend |
+| `POST` | `/auth/refresh`              | No            | Accepts `{ refreshToken }` in the request body; returns `{ accessToken, expiresIn }`            |
+
+### User endpoints
+
+All user endpoints require an `Authorization: Bearer <accessToken>` header.
+
+| Method | Path                                 | Description                                                                                                                                               |
+|--------|--------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET`  | `/user/profile`                      | Returns `{ displayName, email }` for the authenticated user                                                                                               |
+| `GET`  | `/user/top-tracks?timeRange=<range>` | Returns a list of up to 50 top tracks. `timeRange` must be `short_term` (last 4 weeks), `medium_term` (last 6 months, default), or `long_term` (all time) |

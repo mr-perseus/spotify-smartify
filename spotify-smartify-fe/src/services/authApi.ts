@@ -1,8 +1,15 @@
-const API_BASE_URL = 'http://127.0.0.1:8080';
+import { UnauthorizedError } from './errors';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8080';
 
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
+  expiresIn: number;
+}
+
+export interface RefreshResult {
+  accessToken: string;
   expiresIn: number;
 }
 
@@ -14,12 +21,14 @@ export const authApi = {
     return data.authorizationUrl;
   },
 
-  exchangeCode: async (code: string): Promise<AuthTokens> => {
-    const response = await fetch(`${API_BASE_URL}/auth/callback?code=${encodeURIComponent(code)}`);
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Authentication failed');
-    }
+  refreshToken: async (refreshToken: string): Promise<RefreshResult> => {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (response.status === 401) throw new UnauthorizedError();
+    if (!response.ok) throw new Error('Failed to refresh token');
     return response.json();
   },
 };

@@ -1,5 +1,6 @@
 package com.example.spotifysmartifybe.controller;
 
+import com.example.spotifysmartifybe.dto.RefreshResponse;
 import com.example.spotifysmartifybe.service.AuthService;
 import com.example.spotifysmartifybe.service.UserService;
 import jakarta.annotation.PostConstruct;
@@ -8,10 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import se.michaelthelin.spotify.model_objects.credentials.AuthorizationCodeCredentials;
 
 import java.net.URI;
@@ -63,9 +61,8 @@ public class AuthController {
             AuthorizationCodeCredentials credentials = authService.exchangeCode(code);
 
             if (!allowedSpotifyIds.isEmpty()) {
-                String spotifyId = userService.getCurrentUserProfile().getId();
+                String spotifyId = userService.getCurrentUserProfile(credentials.getAccessToken()).getId();
                 if (!allowedSpotifyIds.contains(spotifyId)) {
-                    authService.clearTokens();
                     return redirectToFrontend("/?error=access_denied");
                 }
             }
@@ -78,6 +75,19 @@ public class AuthController {
         } catch (Exception e) {
             return redirectToFrontend("/?error=exchange_failed");
         }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshResponse> refresh(@RequestBody Map<String, String> body) {
+        String refreshToken = body.get("refreshToken");
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        AuthorizationCodeCredentials credentials = authService.refreshAccessToken(refreshToken);
+        return ResponseEntity.ok(new RefreshResponse(
+                credentials.getAccessToken(),
+                credentials.getExpiresIn()
+        ));
     }
 
     private ResponseEntity<Void> redirectToFrontend(String path) {

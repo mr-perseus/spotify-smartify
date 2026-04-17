@@ -56,6 +56,37 @@
   color: #fff;
 }
 
+/* Time range selector */
+.time-range-selector {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.time-range-btn {
+  padding: 7px 14px;
+  background: transparent;
+  border: 1px solid #333;
+  color: #b3b3b3;
+  border-radius: 50px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  white-space: nowrap;
+}
+
+.time-range-btn:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+.time-range-btn.active {
+  background: #1db954;
+  border-color: #1db954;
+  color: #000;
+}
+
 /* Form */
 .profile-form {
   display: flex;
@@ -174,7 +205,7 @@
 
 .track-row {
   display: grid;
-  grid-template-columns: 32px 48px 1fr;
+  grid-template-columns: 32px 48px 1fr 32px;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
@@ -239,4 +270,36 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Preview play/pause button */
+.track-preview-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 50%;
+  color: #b3b3b3;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.track-preview-btn:hover {
+  border-color: #1db954;
+  color: #1db954;
+}
+
+.track-preview-btn.playing {
+  background: #1db954;
+  border-color: #1db954;
+  color: #000;
+}
+
+.track-preview-btn.no-preview {
+  opacity: 0;
+  pointer-events: none;
 }

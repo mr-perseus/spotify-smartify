@@ -1,29 +1,62 @@
-import React, { useEffect, useState, FormEvent } from 'react';
+import React, { useEffect, useState, useRef, FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { userApi, TopTrack, UnauthorizedError } from '../services/userApi';
+import { useAuthenticatedApi } from '../hooks/useAuthenticatedApi';
+import { TopTrack, TimeRange, TIME_RANGE_LABELS } from '../services/userApi';
+import { UnauthorizedError } from '../services/errors';
 import './ProfilePage.css';
 
 export default function ProfilePage() {
   const { logout } = useAuth();
+  const api = useAuthenticatedApi();
 
   const [username, setUsername] = useState('');
   const [savedUsername, setSavedUsername] = useState('');
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [timeRange, setTimeRange] = useState<TimeRange>('medium_term');
   const [tracks, setTracks] = useState<TopTrack[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(false);
   const [tracksError, setTracksError] = useState<string | null>(null);
 
-  // Pre-fill username from Spotify profile on first load
+  // Audio preview state
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+
+  // Pre-fill username from Spotify profile on mount
   useEffect(() => {
-    userApi.getProfile()
+    api.getProfile()
       .then((profile) => {
         if (profile.displayName) setUsername(profile.displayName);
       })
       .catch((err) => {
         if (err instanceof UnauthorizedError) {
           logout();
+        } else {
+          setProfileError('Could not load your Spotify profile. Please try again.');
         }
       });
-  }, [logout]);
+    // api is intentionally excluded: profile fetch should only run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Stop playback whenever the track list is replaced
+  useEffect(() => {
+    audioRef.current?.pause();
+    setPlayingId(null);
+  }, [tracks]);
+
+  const togglePreview = (track: TopTrack) => {
+    if (!track.previewUrl) return;
+    if (playingId === track.id) {
+      audioRef.current?.pause();
+      setPlayingId(null);
+    } else {
+      audioRef.current?.pause();
+      audioRef.current = new Audio(track.previewUrl);
+      audioRef.current.play();
+      audioRef.current.onended = () => setPlayingId(null);
+      setPlayingId(track.id);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -35,7 +68,7 @@ export default function ProfilePage() {
     setTracks([]);
 
     try {
-      const data = await userApi.getTopTracks();
+      const data = await api.getTopTracks(timeRange);
       setTracks(data);
     } catch (err: any) {
       if (err instanceof UnauthorizedError) {
@@ -61,6 +94,23 @@ export default function ProfilePage() {
           </div>
           <h1 className="profile-title">Spotify Smartify</h1>
           <button className="profile-logout" onClick={logout}>Log out</button>
+        </div>
+
+        {/* Profile error */}
+        {profileError && <p className="profile-error">{profileError}</p>}
+
+        {/* Time range selector */}
+        <div className="time-range-selector">
+          {(Object.keys(TIME_RANGE_LABELS) as TimeRange[]).map((range) => (
+            <button
+              key={range}
+              type="button"
+              className={`time-range-btn${timeRange === range ? ' active' : ''}`}
+              onClick={() => setTimeRange(range)}
+            >
+              {TIME_RANGE_LABELS[range]}
+            </button>
+          ))}
         </div>
 
         {/* Username form */}
@@ -104,6 +154,8 @@ export default function ProfilePage() {
               <>
                 <p className="tracks-heading">
                   {savedUsername}'s top {tracks.length} tracks
+                  &nbsp;·&nbsp;
+                  {TIME_RANGE_LABELS[timeRange].toLowerCase()}
                 </p>
                 <div className="tracks-list">
                   {tracks.map((track, index) => (
@@ -128,6 +180,27 @@ export default function ProfilePage() {
                         <p className="track-artists">{track.artists}</p>
                         <p className="track-album">{track.albumName}</p>
                       </div>
+                      {track.previewUrl ? (
+                        <button
+                          className={`track-preview-btn${playingId === track.id ? ' playing' : ''}`}
+                          type="button"
+                          onClick={() => togglePreview(track)}
+                          title={playingId === track.id ? 'Pause preview' : 'Play 30s preview'}
+                        >
+                          {playingId === track.id ? (
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true">
+                              <rect x="6" y="4" width="4" height="16" rx="1" />
+                              <rect x="14" y="4" width="4" height="16" rx="1" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="track-preview-btn no-preview" title="No preview available" />
+                      )}
                     </div>
                   ))}
                 </div>

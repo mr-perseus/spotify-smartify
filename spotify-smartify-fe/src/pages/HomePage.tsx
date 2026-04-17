@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import './HomePage.css';
 
 export default function HomePage() {
-  const { tokens, logout } = useAuth();
+  const { logout } = useAuth();
 
   return (
     <div className="home-page">
@@ -21,15 +21,6 @@ export default function HomePage() {
           <span className="home-status-dot" />
           <span className="home-status-text">Connected to Spotify</span>
         </div>
-
-        {tokens && (
-          <div className="home-token-info">
-            <p className="home-token-label">Access Token</p>
-            <p className="home-token-value">{tokens.accessToken.slice(0, 40)}…</p>
-            <p className="home-token-label">Expires in</p>
-            <p className="home-token-value">{tokens.expiresIn}s</p>
-          </div>
-        )}
 
         <button className="home-logout-button" onClick={logout}>
           Log out

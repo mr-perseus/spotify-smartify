@@ -1,14 +1,21 @@
-const API_BASE_URL = 'http://127.0.0.1:8080';
+import { UnauthorizedError } from './errors';
 
-export class UnauthorizedError extends Error {
-  constructor() {
-    super('unauthorized');
-    this.name = 'UnauthorizedError';
-  }
-}
+export { UnauthorizedError } from './errors';
 
-async function fetchOrThrow(url: string): Promise<any> {
-  const response = await fetch(url);
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8080';
+
+export type TimeRange = 'short_term' | 'medium_term' | 'long_term';
+
+export const TIME_RANGE_LABELS: Record<TimeRange, string> = {
+  short_term: 'Last 4 weeks',
+  medium_term: 'Last 6 months',
+  long_term: 'All time',
+};
+
+async function fetchOrThrow(url: string, accessToken: string): Promise<any> {
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   if (response.status === 401) throw new UnauthorizedError();
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return response.json();
@@ -30,11 +37,11 @@ export interface UserProfile {
 }
 
 export const userApi = {
-  getProfile: async (): Promise<UserProfile> => {
-    return fetchOrThrow(`${API_BASE_URL}/user/profile`);
+  getProfile: async (accessToken: string): Promise<UserProfile> => {
+    return fetchOrThrow(`${API_BASE_URL}/user/profile`, accessToken);
   },
 
-  getTopTracks: async (): Promise<TopTrack[]> => {
-    return fetchOrThrow(`${API_BASE_URL}/user/top-tracks`);
+  getTopTracks: async (accessToken: string, timeRange: TimeRange = 'medium_term'): Promise<TopTrack[]> => {
+    return fetchOrThrow(`${API_BASE_URL}/user/top-tracks?timeRange=${timeRange}`, accessToken);
   },
 };
