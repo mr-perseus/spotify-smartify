@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import se.michaelthelin.spotify.exceptions.detailed.ForbiddenException;
 import se.michaelthelin.spotify.exceptions.detailed.NotFoundException;
 import se.michaelthelin.spotify.exceptions.detailed.UnauthorizedException;
 
@@ -21,7 +22,7 @@ public class PlaylistController {
     public ResponseEntity<PlaylistResponse> getPlaylistTracks(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable String playlistId)
-            throws UnauthorizedException, NotFoundException {
+            throws UnauthorizedException, NotFoundException, ForbiddenException {
 
         String accessToken = requireBearerToken(authHeader);
         PlaylistResponse response = playlistService.getPlaylistWithTracks(accessToken, playlistId);

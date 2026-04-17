@@ -7,6 +7,7 @@ import com.example.spotifysmartifybe.exception.SpotifyApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import se.michaelthelin.spotify.SpotifyApi;
+import se.michaelthelin.spotify.exceptions.detailed.ForbiddenException;
 import se.michaelthelin.spotify.exceptions.detailed.NotFoundException;
 import se.michaelthelin.spotify.exceptions.detailed.UnauthorizedException;
 import se.michaelthelin.spotify.model_objects.specification.ArtistSimplified;
@@ -28,14 +29,14 @@ public class PlaylistService {
     private final SpotifyApiFactory spotifyApiFactory;
 
     public PlaylistResponse getPlaylistWithTracks(String accessToken, String playlistId)
-            throws UnauthorizedException, NotFoundException {
+            throws UnauthorizedException, NotFoundException, ForbiddenException {
 
         SpotifyApi api = spotifyApiFactory.createWithAccessToken(accessToken);
 
         String playlistName;
         try {
             playlistName = api.getPlaylist(playlistId).build().execute().getName();
-        } catch (UnauthorizedException | NotFoundException e) {
+        } catch (UnauthorizedException | NotFoundException | ForbiddenException e) {
             throw e;
         } catch (Exception e) {
             throw new SpotifyApiException("Failed to fetch playlist info", e);
@@ -61,7 +62,7 @@ public class PlaylistService {
                 if (page.getNext() == null) break;
                 offset += PAGE_LIMIT;
             }
-        } catch (UnauthorizedException | NotFoundException e) {
+        } catch (UnauthorizedException | NotFoundException | ForbiddenException e) {
             throw e;
         } catch (Exception e) {
             throw new SpotifyApiException("Failed to fetch playlist tracks", e);
