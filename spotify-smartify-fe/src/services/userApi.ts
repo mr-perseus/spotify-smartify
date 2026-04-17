@@ -1,6 +1,21 @@
 const API_BASE_URL = 'http://127.0.0.1:8080';
 
+export class UnauthorizedError extends Error {
+  constructor() {
+    super('unauthorized');
+    this.name = 'UnauthorizedError';
+  }
+}
+
+async function fetchOrThrow(url: string): Promise<any> {
+  const response = await fetch(url);
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return response.json();
+}
+
 export interface TopTrack {
+  id: string;
   name: string;
   artists: string;
   albumName: string;
@@ -16,14 +31,10 @@ export interface UserProfile {
 
 export const userApi = {
   getProfile: async (): Promise<UserProfile> => {
-    const response = await fetch(`${API_BASE_URL}/user/profile`);
-    if (!response.ok) throw new Error('Failed to fetch profile');
-    return response.json();
+    return fetchOrThrow(`${API_BASE_URL}/user/profile`);
   },
 
-  getTopTrack: async (): Promise<TopTrack> => {
-    const response = await fetch(`${API_BASE_URL}/user/top-track`);
-    if (!response.ok) throw new Error('Failed to fetch top track');
-    return response.json();
+  getTopTracks: async (): Promise<TopTrack[]> => {
+    return fetchOrThrow(`${API_BASE_URL}/user/top-tracks`);
   },
 };

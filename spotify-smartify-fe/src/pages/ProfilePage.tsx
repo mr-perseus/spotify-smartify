@@ -1,6 +1,6 @@
 import React, { useEffect, useState, FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { userApi, TopTrack } from '../services/userApi';
+import { userApi, TopTrack, UnauthorizedError } from '../services/userApi';
 import './ProfilePage.css';
 
 export default function ProfilePage() {
@@ -8,45 +8,50 @@ export default function ProfilePage() {
 
   const [username, setUsername] = useState('');
   const [savedUsername, setSavedUsername] = useState('');
-  const [topTrack, setTopTrack] = useState<TopTrack | null>(null);
-  const [loadingTrack, setLoadingTrack] = useState(false);
-  const [trackError, setTrackError] = useState<string | null>(null);
+  const [tracks, setTracks] = useState<TopTrack[]>([]);
+  const [loadingTracks, setLoadingTracks] = useState(false);
+  const [tracksError, setTracksError] = useState<string | null>(null);
 
   // Pre-fill username from Spotify profile on first load
   useEffect(() => {
     userApi.getProfile()
       .then((profile) => {
-        if (profile.displayName) {
-          setUsername(profile.displayName);
-        }
+        if (profile.displayName) setUsername(profile.displayName);
       })
-      .catch(() => {
-        // non-critical — user can type manually
+      .catch((err) => {
+        if (err instanceof UnauthorizedError) {
+          logout();
+        }
       });
-  }, []);
+  }, [logout]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!username.trim()) return;
 
     setSavedUsername(username.trim());
-    setLoadingTrack(true);
-    setTrackError(null);
-    setTopTrack(null);
+    setLoadingTracks(true);
+    setTracksError(null);
+    setTracks([]);
 
     try {
-      const track = await userApi.getTopTrack();
-      setTopTrack(track);
+      const data = await userApi.getTopTracks();
+      setTracks(data);
     } catch (err: any) {
-      setTrackError(err.message || 'Could not load top track.');
+      if (err instanceof UnauthorizedError) {
+        logout();
+      } else {
+        setTracksError(err.message || 'Could not load top tracks.');
+      }
     } finally {
-      setLoadingTrack(false);
+      setLoadingTracks(false);
     }
   };
 
   return (
     <div className="profile-page">
       <div className="profile-card">
+
         {/* Header */}
         <div className="profile-header">
           <div className="profile-logo">
@@ -55,16 +60,12 @@ export default function ProfilePage() {
             </svg>
           </div>
           <h1 className="profile-title">Spotify Smartify</h1>
-          <button className="profile-logout" onClick={logout} title="Log out">
-            Log out
-          </button>
+          <button className="profile-logout" onClick={logout}>Log out</button>
         </div>
 
         {/* Username form */}
         <form className="profile-form" onSubmit={handleSubmit}>
-          <label className="profile-label" htmlFor="username">
-            Your name
-          </label>
+          <label className="profile-label" htmlFor="username">Your name</label>
           <div className="profile-input-row">
             <input
               id="username"
@@ -78,64 +79,59 @@ export default function ProfilePage() {
             <button
               className="profile-submit"
               type="submit"
-              disabled={!username.trim() || loadingTrack}
+              disabled={!username.trim() || loadingTracks}
             >
-              {loadingTrack ? 'Loading…' : 'Show my top track'}
+              {loadingTracks ? 'Loading…' : 'Show my top tracks'}
             </button>
           </div>
         </form>
 
-        {/* Top track result */}
+        {/* Results */}
         {savedUsername && (
           <div className="profile-result">
-            {loadingTrack && (
+            {loadingTracks && (
               <div className="profile-loading">
                 <div className="profile-spinner" />
-                <p>Fetching {savedUsername}'s top track…</p>
+                <p>Fetching {savedUsername}'s top tracks…</p>
               </div>
             )}
 
-            {trackError && !loadingTrack && (
-              <p className="profile-error">{trackError}</p>
+            {tracksError && !loadingTracks && (
+              <p className="profile-error">{tracksError}</p>
             )}
 
-            {topTrack && !loadingTrack && (
-              <div className="top-track">
-                <p className="top-track-heading">
-                  {savedUsername}'s most listened song
+            {tracks.length > 0 && !loadingTracks && (
+              <>
+                <p className="tracks-heading">
+                  {savedUsername}'s top {tracks.length} tracks
                 </p>
-                <div className="top-track-card">
-                  {topTrack.albumImageUrl && (
-                    <img
-                      className="top-track-art"
-                      src={topTrack.albumImageUrl}
-                      alt={`${topTrack.albumName} cover`}
-                    />
-                  )}
-                  <div className="top-track-info">
-                    <p className="top-track-name">{topTrack.name}</p>
-                    <p className="top-track-artists">{topTrack.artists}</p>
-                    <p className="top-track-album">{topTrack.albumName}</p>
-                    {topTrack.spotifyUrl && (
-                      <a
-                        className="top-track-link"
-                        href={topTrack.spotifyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Open in Spotify
-                      </a>
-                    )}
-                  </div>
+                <div className="tracks-list">
+                  {tracks.map((track, index) => (
+                    <div key={track.id} className="track-row">
+                      <span className="track-rank">#{index + 1}</span>
+                      {track.albumImageUrl && (
+                        <img
+                          className="track-art"
+                          src={track.albumImageUrl}
+                          alt={track.albumName}
+                        />
+                      )}
+                      <div className="track-info">
+                        <a
+                          className="track-name"
+                          href={track.spotifyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {track.name}
+                        </a>
+                        <p className="track-artists">{track.artists}</p>
+                        <p className="track-album">{track.albumName}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                {topTrack.previewUrl && (
-                  <audio
-                    className="top-track-audio"
-                    controls
-                    src={topTrack.previewUrl}
-                  />
-                )}
-              </div>
+              </>
             )}
           </div>
         )}
