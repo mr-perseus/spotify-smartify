@@ -29,28 +29,18 @@ public class PlaylistService {
     private static final int MAX_TRACKS = 500;
 
     private final RestTemplate restTemplate;
-    private final AuthService authService;
 
     public PlaylistResponse getPlaylistWithTracks(String accessToken, String playlistId) {
         String playlistName = fetchPlaylistName(accessToken, playlistId);
 
-        // Try with user token first (works for owned/collaborative playlists)
         try {
             List<TrackResponse> tracks = fetchPlaylistItems(accessToken, playlistId);
             return new PlaylistResponse(playlistName, tracks);
         } catch (HttpClientErrorException.Forbidden e) {
-            log.info("User token got 403 for playlist {}, trying client credentials fallback", playlistId);
-        }
-
-        // Fallback: try with client credentials token (may work for public playlists)
-        try {
-            String ccToken = authService.getClientCredentialsToken();
-            List<TrackResponse> tracks = fetchPlaylistItems(ccToken, playlistId);
-            return new PlaylistResponse(playlistName, tracks);
-        } catch (HttpClientErrorException.Forbidden e) {
+            log.info("403 for playlist {} — Dev Mode restricts access to owned/collaborative playlists only", playlistId);
             throw new SpotifyApiException(
-                    "This playlist is not accessible. In Spotify's current Dev Mode, " +
-                    "only playlists you own or collaborate on are supported.");
+                    "This playlist is not accessible. Spotify's Dev Mode only allows access " +
+                    "to playlists you own or collaborate on.");
         }
     }
 
