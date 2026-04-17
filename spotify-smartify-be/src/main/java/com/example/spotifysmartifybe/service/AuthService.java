@@ -48,4 +48,20 @@ public class AuthService {
             throw new SpotifyApiException("Failed to refresh access token", e);
         }
     }
+
+    /**
+     * Obtains an access token via the Client Credentials flow (no user context).
+     * Useful for accessing public resources that don't require user authorization.
+     */
+    public String getClientCredentialsToken() {
+        try {
+            return spotifyApiFactory.createForAuth()
+                    .clientCredentials()
+                    .build()
+                    .execute()
+                    .getAccessToken();
+        } catch (Exception e) {
+            throw new SpotifyApiException("Failed to obtain client credentials token", e);
+        }
+    }
 }
