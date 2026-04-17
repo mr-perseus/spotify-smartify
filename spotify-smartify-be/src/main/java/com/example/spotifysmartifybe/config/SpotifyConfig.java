@@ -6,8 +6,6 @@ import org.springframework.context.annotation.Configuration;
 import se.michaelthelin.spotify.SpotifyApi;
 import se.michaelthelin.spotify.SpotifyHttpManager;
 
-import java.net.URI;
-
 @Configuration
 public class SpotifyConfig {
 

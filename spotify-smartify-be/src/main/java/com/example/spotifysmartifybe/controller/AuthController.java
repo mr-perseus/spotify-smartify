@@ -2,6 +2,7 @@ package com.example.spotifysmartifybe.controller;
 
 import com.example.spotifysmartifybe.service.AuthService;
 import com.example.spotifysmartifybe.service.UserService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -32,65 +33,56 @@ public class AuthController {
     @Value("${app.allowed-spotify-ids:}")
     private String allowedSpotifyIdsRaw;
 
-    /**
-     * GET /auth/login
-     * Returns the Spotify authorization URL the client should redirect the user to.
-     */
-    @GetMapping("/login")
-    public ResponseEntity<Map<String, String>> login() {
-        URI authUri = authService.getAuthorizationUri();
-        return ResponseEntity.ok(Map.of("authorizationUrl", authUri.toString()));
+    private List<String> allowedSpotifyIds;
+
+    @PostConstruct
+    void init() {
+        allowedSpotifyIds = (allowedSpotifyIdsRaw == null || allowedSpotifyIdsRaw.isBlank())
+                ? List.of()
+                : Arrays.stream(allowedSpotifyIdsRaw.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .toList();
     }
 
-    /**
-     * GET /auth/callback?code=...
-     * Spotify redirects the browser here. Exchanges the code for tokens, checks the
-     * user against the whitelist, then redirects to the React frontend /callback route.
-     */
+    @GetMapping("/login")
+    public ResponseEntity<Map<String, String>> login() {
+        return ResponseEntity.ok(Map.of("authorizationUrl", authService.getAuthorizationUri().toString()));
+    }
+
     @GetMapping("/callback")
     public ResponseEntity<Void> callback(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String error) {
 
-        HttpHeaders headers = new HttpHeaders();
-
         if (error != null || code == null) {
-            String reason = error != null ? error : "missing_code";
-            headers.setLocation(URI.create(frontendUrl + "/?error=" + reason));
-            return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
+            return redirectToFrontend("/?error=" + (error != null ? error : "missing_code"));
         }
 
         try {
             AuthorizationCodeCredentials credentials = authService.exchangeCode(code);
 
-            // Whitelist check — skip if no IDs are configured
-            List<String> allowedIds = parseAllowedIds(allowedSpotifyIdsRaw);
-            if (!allowedIds.isEmpty()) {
+            if (!allowedSpotifyIds.isEmpty()) {
                 String spotifyId = userService.getCurrentUserProfile().getId();
-                if (!allowedIds.contains(spotifyId)) {
+                if (!allowedSpotifyIds.contains(spotifyId)) {
                     authService.clearTokens();
-                    headers.setLocation(URI.create(frontendUrl + "/?error=access_denied"));
-                    return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
+                    return redirectToFrontend("/?error=access_denied");
                 }
             }
 
-            String location = frontendUrl + "/callback"
+            return redirectToFrontend("/callback"
                     + "?accessToken=" + credentials.getAccessToken()
                     + "&refreshToken=" + credentials.getRefreshToken()
-                    + "&expiresIn=" + credentials.getExpiresIn();
-            headers.setLocation(URI.create(location));
-        } catch (Exception e) {
-            headers.setLocation(URI.create(frontendUrl + "/?error=exchange_failed"));
-        }
+                    + "&expiresIn=" + credentials.getExpiresIn());
 
-        return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
+        } catch (Exception e) {
+            return redirectToFrontend("/?error=exchange_failed");
+        }
     }
 
-    private List<String> parseAllowedIds(String raw) {
-        if (raw == null || raw.isBlank()) return List.of();
-        return Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
+    private ResponseEntity<Void> redirectToFrontend(String path) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setLocation(URI.create(frontendUrl + path));
+        return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
     }
 }
