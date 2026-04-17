@@ -1,0 +1,4 @@
+spotify:
+  client-id: test-client-id
+  client-secret: test-client-secret
+  redirect-uri: http://localhost:8080/auth/callback

@@ -1,0 +1,99 @@
+.home-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #121212;
+}
+
+.home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 40px;
+  background: #1e1e1e;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.home-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-logo {
+  color: #1db954;
+}
+
+.home-title {
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.home-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #1db954;
+}
+
+.home-status-text {
+  color: #1db954;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.home-token-info {
+  background: #282828;
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  align-items: baseline;
+}
+
+.home-token-label {
+  margin: 0;
+  color: #b3b3b3;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.home-token-value {
+  margin: 0;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.home-logout-button {
+  padding: 12px;
+  background: transparent;
+  color: #b3b3b3;
+  border: 1px solid #333;
+  border-radius: 50px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.home-logout-button:hover {
+  border-color: #ffffff;
+  color: #ffffff;
+}

@@ -1,25 +1,45 @@
 import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import LoginPage from './pages/LoginPage';
+import CallbackPage from './pages/CallbackPage';
+import HomePage from './pages/HomePage';
+
+function ProtectedRoute({ children }: { children: React.ReactElement }) {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? children : <Navigate to="/" replace />;
+}
+
+function AppRoutes() {
+  const { isAuthenticated } = useAuth();
+
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={isAuthenticated ? <Navigate to="/home" replace /> : <LoginPage />}
+      />
+      <Route path="/callback" element={<CallbackPage />} />
+      <Route
+        path="/home"
+        element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
