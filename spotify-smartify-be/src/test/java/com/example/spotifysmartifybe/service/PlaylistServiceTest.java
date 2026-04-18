@@ -1,6 +1,7 @@
 package com.example.spotifysmartifybe.service;
 
 import com.example.spotifysmartifybe.dto.PlaylistResponse;
+import com.example.spotifysmartifybe.dto.PlaylistSummary;
 import com.example.spotifysmartifybe.dto.TrackResponse;
 import com.example.spotifysmartifybe.exception.SpotifyApiException;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,6 +28,7 @@ class PlaylistServiceTest {
 
     private static final String PLAYLIST_ID = "pl123";
     private static final String TOKEN = "test-token";
+    private static final String CURRENT_USER_ID = "user123";
 
     @BeforeEach
     void setUp() {
@@ -215,7 +219,7 @@ class PlaylistServiceTest {
 
         assertThatThrownBy(() -> playlistService.getPlaylistWithTracks(TOKEN, PLAYLIST_ID))
                 .isInstanceOf(SpotifyApiException.class)
-                .hasMessageContaining("403");
+                .hasMessageContaining("not accessible");
         mockServer.verify();
     }
 
@@ -278,5 +282,178 @@ class PlaylistServiceTest {
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("Authorization", "Bearer " + TOKEN))
                 .andRespond(withSuccess(responseJson, MediaType.APPLICATION_JSON));
+    }
+
+    // --- getUserPlaylists helpers ---
+
+    private static final String ME_URL = "https://api.spotify.com/v1/me";
+
+    private String userPlaylistsUrl(int offset) {
+        return "https://api.spotify.com/v1/me/playlists?limit=50&offset=" + offset;
+    }
+
+    private void mockCurrentUser() {
+        mockServer.expect(requestTo(ME_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("Authorization", "Bearer " + TOKEN))
+                .andRespond(withSuccess("""
+                        {"id": "%s"}
+                        """.formatted(CURRENT_USER_ID), MediaType.APPLICATION_JSON));
+    }
+
+    private String playlistJson(String id, String name, String ownerId, boolean collaborative) {
+        return """
+                {
+                    "id": "%s", "name": "%s", "collaborative": %s,
+                    "owner": {"id": "%s", "display_name": "Owner"},
+                    "images": [{"url": "https://img.test/%s.jpg"}],
+                    "tracks": {"total": 10}
+                }
+                """.formatted(id, name, collaborative, ownerId, id);
+    }
+
+    // --- getUserPlaylists tests ---
+
+    @Test
+    void getUserPlaylists_returnsOwnedAndCollaborativePlaylists() {
+        mockCurrentUser();
+        mockServer.expect(requestTo(userPlaylistsUrl(0)))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("Authorization", "Bearer " + TOKEN))
+                .andRespond(withSuccess("""
+                        {
+                            "items": [
+                                %s,
+                                %s,
+                                %s
+                            ],
+                            "next": null
+                        }
+                        """.formatted(
+                        playlistJson("p1", "My Playlist", CURRENT_USER_ID, false),
+                        playlistJson("p2", "Collab Mix", "other-user", true),
+                        playlistJson("p3", "Followed Public", "other-user", false)
+                ), MediaType.APPLICATION_JSON));
+
+        List<PlaylistSummary> result = playlistService.getUserPlaylists(TOKEN);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).id()).isEqualTo("p1");
+        assertThat(result.get(0).name()).isEqualTo("My Playlist");
+        assertThat(result.get(1).id()).isEqualTo("p2");
+        assertThat(result.get(1).collaborative()).isTrue();
+        mockServer.verify();
+    }
+
+    @Test
+    void getUserPlaylists_filtersOutAllFollowedPlaylists() {
+        mockCurrentUser();
+        mockServer.expect(requestTo(userPlaylistsUrl(0)))
+                .andRespond(withSuccess("""
+                        {
+                            "items": [
+                                %s,
+                                %s
+                            ],
+                            "next": null
+                        }
+                        """.formatted(
+                        playlistJson("p1", "Public A", "stranger1", false),
+                        playlistJson("p2", "Public B", "stranger2", false)
+                ), MediaType.APPLICATION_JSON));
+
+        List<PlaylistSummary> result = playlistService.getUserPlaylists(TOKEN);
+
+        assertThat(result).isEmpty();
+        mockServer.verify();
+    }
+
+    @Test
+    void getUserPlaylists_mapsFieldsCorrectly() {
+        mockCurrentUser();
+        mockServer.expect(requestTo(userPlaylistsUrl(0)))
+                .andRespond(withSuccess("""
+                        {
+                            "items": [
+                                %s
+                            ],
+                            "next": null
+                        }
+                        """.formatted(playlistJson("p1", "My Playlist", CURRENT_USER_ID, false)),
+                        MediaType.APPLICATION_JSON));
+
+        List<PlaylistSummary> result = playlistService.getUserPlaylists(TOKEN);
+
+        assertThat(result).hasSize(1);
+        PlaylistSummary pl = result.getFirst();
+        assertThat(pl.id()).isEqualTo("p1");
+        assertThat(pl.name()).isEqualTo("My Playlist");
+        assertThat(pl.imageUrl()).isEqualTo("https://img.test/p1.jpg");
+        assertThat(pl.trackCount()).isEqualTo(10);
+        assertThat(pl.ownerName()).isEqualTo("Owner");
+        assertThat(pl.collaborative()).isFalse();
+        mockServer.verify();
+    }
+
+    @Test
+    void getUserPlaylists_emptyResponse_returnsEmptyList() {
+        mockCurrentUser();
+        mockServer.expect(requestTo(userPlaylistsUrl(0)))
+                .andRespond(withSuccess("""
+                        {"items": [], "next": null}
+                        """, MediaType.APPLICATION_JSON));
+
+        List<PlaylistSummary> result = playlistService.getUserPlaylists(TOKEN);
+
+        assertThat(result).isEmpty();
+        mockServer.verify();
+    }
+
+    @Test
+    void getUserPlaylists_paginatesAndFilters() {
+        mockCurrentUser();
+        // Page 1
+        mockServer.expect(requestTo(userPlaylistsUrl(0)))
+                .andRespond(withSuccess("""
+                        {
+                            "items": [
+                                %s,
+                                %s
+                            ],
+                            "next": "https://api.spotify.com/v1/me/playlists?offset=50"
+                        }
+                        """.formatted(
+                        playlistJson("p1", "Mine", CURRENT_USER_ID, false),
+                        playlistJson("p2", "Followed", "other", false)
+                ), MediaType.APPLICATION_JSON));
+        // Page 2
+        mockServer.expect(requestTo(userPlaylistsUrl(50)))
+                .andRespond(withSuccess("""
+                        {
+                            "items": [
+                                %s
+                            ],
+                            "next": null
+                        }
+                        """.formatted(playlistJson("p3", "Collab", "other", true)),
+                        MediaType.APPLICATION_JSON));
+
+        List<PlaylistSummary> result = playlistService.getUserPlaylists(TOKEN);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).id()).isEqualTo("p1");
+        assertThat(result.get(1).id()).isEqualTo("p3");
+        mockServer.verify();
+    }
+
+    @Test
+    void getUserPlaylists_unauthorized_throwsSpotifyApiException() {
+        mockServer.expect(requestTo(ME_URL))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        assertThatThrownBy(() -> playlistService.getUserPlaylists(TOKEN))
+                .isInstanceOf(SpotifyApiException.class)
+                .hasMessageContaining("expired or invalid");
+        mockServer.verify();
     }
 }

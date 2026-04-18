@@ -362,7 +362,14 @@ export default function PlaylistPage() {
       <div className="playlist-card">
         <Header
           subtitle={playlistName}
-          onBack={async () => { await stopAll(); navigate('/dashboard'); }}
+          backLabel="Playlists"
+          onBack={async () => {
+            await stopAll();
+            setTracks([]);
+            setPlaylistName('');
+            setCurrentIndex(0);
+            resetReveals();
+          }}
           onLogout={logout}
           sdkReady={spotify.isReady}
         />
@@ -513,11 +520,13 @@ function Header({
   onBack,
   onLogout,
   sdkReady,
+  backLabel = 'Dashboard',
 }: {
   subtitle?: string;
   onBack: () => void;
   onLogout: () => void;
   sdkReady: boolean;
+  backLabel?: string;
 }) {
   return (
     <div className="pl-header">
@@ -529,7 +538,12 @@ function Header({
       <span className={`pl-sdk-badge ${sdkReady ? 'ready' : 'not-ready'}`}>
         {sdkReady ? 'Full playback' : 'Preview only'}
       </span>
-      <button className="pl-back-btn" onClick={onBack}>Dashboard</button>
+      <button className="pl-back-btn" onClick={onBack}>
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+          <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+        </svg>
+        {backLabel}
+      </button>
       <button className="pl-logout-btn" onClick={onLogout}>Log out</button>
     </div>
   );

@@ -18,6 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,40 +49,54 @@ public class PlaylistService {
     }
 
     public List<PlaylistSummary> getUserPlaylists(String accessToken) {
-        List<PlaylistSummary> all = new ArrayList<>();
-        int offset = 0;
+        String currentUserId = fetchCurrentUserId(accessToken);
 
-        while (all.size() < MAX_PLAYLISTS) {
-            String url = UriComponentsBuilder.fromUriString(SPOTIFY_API_BASE)
-                    .pathSegment("me", "playlists")
-                    .queryParam("limit", PAGE_LIMIT)
-                    .queryParam("offset", offset)
-                    .toUriString();
+        List<PlaylistSummary> playlists = fetchAllPages(
+                accessToken,
+                MAX_PLAYLISTS,
+                offset -> UriComponentsBuilder.fromUriString(SPOTIFY_API_BASE)
+                        .pathSegment("me", "playlists")
+                        .queryParam("limit", PAGE_LIMIT)
+                        .queryParam("offset", offset)
+                        .toUriString(),
+                SpotifyPlaylistListResponse.class,
+                "user playlists",
+                SpotifyPlaylistListResponse::items,
+                SpotifyPlaylistListResponse::next,
+                sp -> toPlaylistSummaryOrNull(sp, currentUserId)
+        );
+        log.info("Fetched {} owned/collaborative playlists for user {}", playlists.size(), currentUserId);
+        return playlists;
+    }
 
-            SpotifyPlaylistListResponse page = spotifyGet(url, accessToken,
-                    SpotifyPlaylistListResponse.class, "user playlists");
-            if (page == null || page.items() == null) {
-                break;
-            }
-
-            for (SpotifySimplifiedPlaylist sp : page.items()) {
-                String imageUrl = (sp.images() != null && !sp.images().isEmpty())
-                        ? sp.images().getFirst().url() : null;
-                int trackCount = (sp.items() != null) ? sp.items().total() : 0;
-                String ownerName = (sp.owner() != null && sp.owner().displayName() != null)
-                        ? sp.owner().displayName() : "";
-                all.add(new PlaylistSummary(
-                        sp.id(), sp.name(), imageUrl, trackCount, ownerName, sp.collaborative()));
-            }
-
-            if (page.next() == null) {
-                break;
-            }
-            offset += PAGE_LIMIT;
+    private String fetchCurrentUserId(String accessToken) {
+        String url = SPOTIFY_API_BASE + "/me";
+        SpotifyCurrentUser user = spotifyGet(url, accessToken, SpotifyCurrentUser.class, "current user");
+        if (user == null || user.id() == null) {
+            throw new SpotifyApiException("Could not determine current user");
         }
+        return user.id();
+    }
 
-        log.info("Fetched {} playlists for user", all.size());
-        return all;
+    /**
+     * Maps a Spotify playlist to a PlaylistSummary, returning null for playlists
+     * the user neither owns nor collaborates on (i.e. followed public playlists).
+     */
+    private PlaylistSummary toPlaylistSummaryOrNull(SpotifySimplifiedPlaylist sp, String currentUserId) {
+        boolean isOwner = sp.owner() != null && currentUserId.equals(sp.owner().id());
+        if (!isOwner && !sp.collaborative()) {
+            return null;
+        }
+        return toPlaylistSummary(sp);
+    }
+
+    private PlaylistSummary toPlaylistSummary(SpotifySimplifiedPlaylist sp) {
+        String imageUrl = (sp.images() != null && !sp.images().isEmpty())
+                ? sp.images().getFirst().url() : null;
+        int trackCount = (sp.tracks() != null) ? sp.tracks().total() : 0;
+        String ownerName = (sp.owner() != null && sp.owner().displayName() != null)
+                ? sp.owner().displayName() : "";
+        return new PlaylistSummary(sp.id(), sp.name(), imageUrl, trackCount, ownerName, sp.collaborative());
     }
 
     private String fetchPlaylistName(String accessToken, String playlistId) {
@@ -98,46 +113,30 @@ public class PlaylistService {
     }
 
     private List<TrackResponse> fetchPlaylistItems(String token, String playlistId) {
-        List<TrackResponse> allTracks = new ArrayList<>();
-        int offset = 0;
-
-        while (allTracks.size() < MAX_TRACKS) {
-            SpotifyPagingResponse page = fetchPlaylistItemsPage(token, playlistId, offset);
-            if (page == null || page.items() == null) {
-                break;
-            }
-
-            for (SpotifyPlaylistItem playlistItem : page.items()) {
-                if (playlistItem.isLocal()) {
-                    continue;
-                }
-                SpotifyTrack track = playlistItem.track();
-                if (track == null || !"track".equals(track.type())) {
-                    continue;
-                }
-
-                allTracks.add(toTrackResponse(track));
-            }
-
-            if (page.next() == null) {
-                break;
-            }
-            offset += PAGE_LIMIT;
-        }
-
-        log.info("Fetched {} tracks from playlist {}", allTracks.size(), playlistId);
-        return allTracks;
+        List<TrackResponse> tracks = fetchAllPages(
+                token,
+                MAX_TRACKS,
+                offset -> UriComponentsBuilder.fromUriString(SPOTIFY_API_BASE)
+                        .pathSegment("playlists", playlistId, "items")
+                        .queryParam("limit", PAGE_LIMIT)
+                        .queryParam("offset", offset)
+                        .queryParam("additional_types", "track")
+                        .toUriString(),
+                SpotifyPagingResponse.class,
+                "playlist items for " + playlistId,
+                SpotifyPagingResponse::items,
+                SpotifyPagingResponse::next,
+                this::toTrackOrNull
+        );
+        log.info("Fetched {} tracks from playlist {}", tracks.size(), playlistId);
+        return tracks;
     }
 
-    private SpotifyPagingResponse fetchPlaylistItemsPage(String token, String playlistId, int offset) {
-        String url = UriComponentsBuilder.fromUriString(SPOTIFY_API_BASE)
-                .pathSegment("playlists", playlistId, "items")
-                .queryParam("limit", PAGE_LIMIT)
-                .queryParam("offset", offset)
-                .queryParam("additional_types", "track")
-                .toUriString();
-
-        return spotifyGet(url, token, SpotifyPagingResponse.class, "playlist items for " + playlistId);
+    private TrackResponse toTrackOrNull(SpotifyPlaylistItem playlistItem) {
+        if (playlistItem.isLocal()) return null;
+        SpotifyTrack track = playlistItem.track();
+        if (track == null || !"track".equals(track.type())) return null;
+        return toTrackResponse(track);
     }
 
     private TrackResponse toTrackResponse(SpotifyTrack track) {
@@ -177,6 +176,8 @@ public class PlaylistService {
             throw new SpotifyApiException("Access token expired or invalid");
         } catch (HttpClientErrorException.TooManyRequests e) {
             throw e; // handled by GlobalExceptionHandler
+        } catch (HttpClientErrorException.Forbidden e) {
+            throw e; // handled by caller (e.g. getPlaylistWithTracks)
         } catch (HttpClientErrorException e) {
             log.error("Failed to fetch {}: {}", context, e.getStatusCode(), e);
             throw new SpotifyApiException("Failed to fetch " + context + ": " + e.getStatusCode());
@@ -187,6 +188,37 @@ public class PlaylistService {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
         return new HttpEntity<>(headers);
+    }
+
+    /**
+     * Generic paginator: fetches all pages from a Spotify paging endpoint,
+     * mapping each item through {@code mapper}. Items for which mapper returns
+     * {@code null} are silently skipped (useful for filtering).
+     */
+    private <P, I, R> List<R> fetchAllPages(
+            String token,
+            int maxResults,
+            Function<Integer, String> urlBuilder,
+            Class<P> pageType,
+            String context,
+            Function<P, List<I>> itemsExtractor,
+            Function<P, String> nextExtractor,
+            Function<I, R> mapper
+    ) {
+        List<R> all = new ArrayList<>();
+        int offset = 0;
+        while (all.size() < maxResults) {
+            P page = spotifyGet(urlBuilder.apply(offset), token, pageType, context);
+            List<I> items = (page != null) ? itemsExtractor.apply(page) : null;
+            if (items == null) break;
+            for (I item : items) {
+                R mapped = mapper.apply(item);
+                if (mapped != null) all.add(mapped);
+            }
+            if (nextExtractor.apply(page) == null) break;
+            offset += PAGE_LIMIT;
+        }
+        return all;
     }
 
     // --- Spotify API response DTOs ---
@@ -231,11 +263,16 @@ public class PlaylistService {
             List<SpotifyImage> images,
             SpotifyOwner owner,
             boolean collaborative,
-            SpotifyPlaylistItems items) {}
+            @JsonProperty("tracks") SpotifyPlaylistItems tracks) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record SpotifyOwner(@JsonProperty("display_name") String displayName) {}
+    record SpotifyOwner(String id, @JsonProperty("display_name") String displayName) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifyPlaylistItems(int total) {}
+
+    // --- DTO for GET /v1/me ---
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifyCurrentUser(String id) {}
 }

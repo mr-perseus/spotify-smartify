@@ -55,6 +55,9 @@
 
 .pl-back-btn,
 .pl-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: transparent;
   border: 1px solid #555;
   color: #b3b3b3;
