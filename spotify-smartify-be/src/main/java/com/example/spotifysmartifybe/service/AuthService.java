@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import se.michaelthelin.spotify.exceptions.detailed.TooManyRequestsException;
 import se.michaelthelin.spotify.model_objects.credentials.AuthorizationCodeCredentials;
 
 import java.net.URI;
@@ -32,40 +33,31 @@ public class AuthService {
                 .execute();
     }
 
-    public AuthorizationCodeCredentials exchangeCode(String code) {
+    public AuthorizationCodeCredentials exchangeCode(String code) throws TooManyRequestsException {
         try {
             return spotifyApiFactory.createForAuth()
                     .authorizationCode(code)
                     .build()
                     .execute();
+        } catch (TooManyRequestsException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to exchange Spotify authorization code", e);
             throw new SpotifyApiException("Failed to exchange Spotify authorization code", e);
         }
     }
 
-    public AuthorizationCodeCredentials refreshAccessToken(String refreshToken) {
+    public AuthorizationCodeCredentials refreshAccessToken(String refreshToken) throws TooManyRequestsException {
         try {
             return spotifyApiFactory.createWithRefreshToken(refreshToken)
                     .authorizationCodeRefresh()
                     .build()
                     .execute();
+        } catch (TooManyRequestsException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to refresh access token", e);
             throw new SpotifyApiException("Failed to refresh access token", e);
-        }
-    }
-
-    public String getClientCredentialsToken() {
-        try {
-            return spotifyApiFactory.createForAuth()
-                    .clientCredentials()
-                    .build()
-                    .execute()
-                    .getAccessToken();
-        } catch (Exception e) {
-            log.error("Failed to obtain client credentials token", e);
-            throw new SpotifyApiException("Failed to obtain client credentials token", e);
         }
     }
 }

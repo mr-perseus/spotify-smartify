@@ -1,5 +1,6 @@
 package com.example.spotifysmartifybe.controller;
 
+import com.example.spotifysmartifybe.dto.RefreshRequest;
 import com.example.spotifysmartifybe.dto.RefreshResponse;
 import com.example.spotifysmartifybe.service.AuthService;
 import com.example.spotifysmartifybe.service.UserService;
@@ -12,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import se.michaelthelin.spotify.exceptions.detailed.TooManyRequestsException;
 import se.michaelthelin.spotify.model_objects.credentials.AuthorizationCodeCredentials;
 
 import java.net.URI;
@@ -83,8 +85,9 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<RefreshResponse> refresh(@RequestBody Map<String, String> body) {
-        String refreshToken = body.get("refreshToken");
+    public ResponseEntity<RefreshResponse> refresh(@RequestBody RefreshRequest request)
+            throws TooManyRequestsException {
+        String refreshToken = request.refreshToken();
         if (refreshToken == null || refreshToken.isBlank()) {
             return ResponseEntity.badRequest().build();
         }

@@ -7,15 +7,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import se.michaelthelin.spotify.exceptions.detailed.TooManyRequestsException;
 import se.michaelthelin.spotify.exceptions.detailed.UnauthorizedException;
-import se.michaelthelin.spotify.model_objects.specification.ArtistSimplified;
 import se.michaelthelin.spotify.model_objects.specification.User;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static com.example.spotifysmartifybe.controller.BearerTokenResolver.requireBearerToken;
 
 @RestController
 @RequestMapping("/user")
@@ -23,14 +23,13 @@ import java.util.stream.Collectors;
 public class UserController {
 
     private static final Set<String> VALID_TIME_RANGES = Set.of("short_term", "medium_term", "long_term");
-    private static final int BEARER_PREFIX_LENGTH = "Bearer ".length();
 
     private final UserService userService;
 
     @GetMapping("/profile")
     public ResponseEntity<Map<String, String>> getProfile(
             @RequestHeader(value = "Authorization", required = false) String authHeader)
-            throws UnauthorizedException {
+            throws UnauthorizedException, TooManyRequestsException {
         String accessToken = requireBearerToken(authHeader);
         User user = userService.getCurrentUserProfile(accessToken);
         return ResponseEntity.ok(Map.of(
@@ -43,36 +42,13 @@ public class UserController {
     public ResponseEntity<List<TrackResponse>> getTopTracks(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestParam(defaultValue = "medium_term") String timeRange)
-            throws UnauthorizedException {
+            throws UnauthorizedException, TooManyRequestsException {
         String accessToken = requireBearerToken(authHeader);
         if (!VALID_TIME_RANGES.contains(timeRange)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Invalid timeRange. Must be one of: short_term, medium_term, long_term");
         }
-        List<TrackResponse> tracks = userService.getTopTracks(accessToken, timeRange).stream()
-                .map(track -> new TrackResponse(
-                        track.getId(),
-                        track.getName(),
-                        Arrays.stream(track.getArtists())
-                                .map(ArtistSimplified::getName)
-                                .collect(Collectors.joining(", ")),
-                        track.getAlbum().getName(),
-                        track.getAlbum().getImages().length > 0
-                                ? track.getAlbum().getImages()[0].getUrl()
-                                : "",
-                        track.getPreviewUrl() != null ? track.getPreviewUrl() : "",
-                        track.getExternalUrls().get("spotify")
-                ))
-                .toList();
-
+        List<TrackResponse> tracks = userService.getTopTracks(accessToken, timeRange);
         return ResponseEntity.ok(tracks);
-    }
-
-    private String requireBearerToken(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
-                    "Missing or invalid Authorization header");
-        }
-        return authHeader.substring(BEARER_PREFIX_LENGTH);
     }
 }
