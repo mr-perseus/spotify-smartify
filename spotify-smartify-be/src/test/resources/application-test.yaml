@@ -2,3 +2,7 @@ spotify:
   client-id: test-client-id
   client-secret: test-client-secret
   redirect-uri: http://127.0.0.1:8080/auth/callback
+
+app:
+  frontend-url: http://localhost:3000
+  allowed-spotify-ids: ""
