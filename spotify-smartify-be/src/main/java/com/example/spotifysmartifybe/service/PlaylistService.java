@@ -51,27 +51,11 @@ public class PlaylistService {
                 .queryParam("fields", "name")
                 .toUriString();
 
-        try {
-            ResponseEntity<SpotifyPlaylistMeta> response = restTemplate.exchange(
-                    url, HttpMethod.GET, authEntity(accessToken), SpotifyPlaylistMeta.class);
-
-            SpotifyPlaylistMeta body = response.getBody();
-            if (body == null || body.name() == null) {
-                throw new SpotifyApiException("Playlist not found");
-            }
-            return body.name();
-        } catch (HttpClientErrorException.NotFound e) {
-            log.error("Playlist not found: {}", playlistId, e);
-            throw new SpotifyApiException("Playlist not found: " + playlistId);
-        } catch (HttpClientErrorException.Unauthorized e) {
-            log.error("Access token expired or invalid for playlist: {}", playlistId, e);
-            throw new SpotifyApiException("Access token expired or invalid");
-        } catch (HttpClientErrorException.TooManyRequests e) {
-            throw e; // handled by GlobalExceptionHandler
-        } catch (HttpClientErrorException e) {
-            log.error("Failed to fetch playlist info for {}: {}", playlistId, e.getStatusCode(), e);
-            throw new SpotifyApiException("Failed to fetch playlist info: " + e.getStatusCode());
+        SpotifyPlaylistMeta body = spotifyGet(url, accessToken, SpotifyPlaylistMeta.class, "playlist " + playlistId);
+        if (body == null || body.name() == null) {
+            throw new SpotifyApiException("Playlist not found");
         }
+        return body.name();
     }
 
     private List<TrackResponse> fetchPlaylistItems(String token, String playlistId) {
@@ -114,22 +98,7 @@ public class PlaylistService {
                 .queryParam("additional_types", "track")
                 .toUriString();
 
-        try {
-            ResponseEntity<SpotifyPagingResponse> response = restTemplate.exchange(
-                    url, HttpMethod.GET, authEntity(token), SpotifyPagingResponse.class);
-            return response.getBody();
-        } catch (HttpClientErrorException.NotFound e) {
-            log.error("Playlist not found: {}", playlistId, e);
-            throw new SpotifyApiException("Playlist not found: " + playlistId);
-        } catch (HttpClientErrorException.Unauthorized e) {
-            log.error("Access token expired or invalid for playlist: {}", playlistId, e);
-            throw new SpotifyApiException("Access token expired or invalid");
-        } catch (HttpClientErrorException.TooManyRequests e) {
-            throw e; // handled by GlobalExceptionHandler
-        } catch (HttpClientErrorException e) {
-            log.error("Failed to fetch playlist items for {}: {}", playlistId, e.getStatusCode(), e);
-            throw new SpotifyApiException("Failed to fetch playlist items: " + e.getStatusCode());
-        }
+        return spotifyGet(url, token, SpotifyPagingResponse.class, "playlist items for " + playlistId);
     }
 
     private TrackResponse toTrackResponse(SpotifyTrack track) {
@@ -154,6 +123,25 @@ public class PlaylistService {
         return new TrackResponse(
                 track.id(), track.name(), artistNames, albumName,
                 albumImageUrl, previewUrl, spotifyUrl);
+    }
+
+    private <T> T spotifyGet(String url, String token, Class<T> responseType, String context) {
+        try {
+            ResponseEntity<T> response = restTemplate.exchange(
+                    url, HttpMethod.GET, authEntity(token), responseType);
+            return response.getBody();
+        } catch (HttpClientErrorException.NotFound e) {
+            log.error("{} not found", context, e);
+            throw new SpotifyApiException(context + " not found");
+        } catch (HttpClientErrorException.Unauthorized e) {
+            log.error("Access token expired or invalid for {}", context, e);
+            throw new SpotifyApiException("Access token expired or invalid");
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            throw e; // handled by GlobalExceptionHandler
+        } catch (HttpClientErrorException e) {
+            log.error("Failed to fetch {}: {}", context, e.getStatusCode(), e);
+            throw new SpotifyApiException("Failed to fetch " + context + ": " + e.getStatusCode());
+        }
     }
 
     private HttpEntity<Void> authEntity(String token) {
