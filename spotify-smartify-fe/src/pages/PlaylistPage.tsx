@@ -78,6 +78,7 @@ export default function PlaylistPage() {
   const [artRevealed, setArtRevealed] = useState(false);
   const [titleRevealed, setTitleRevealed] = useState(false);
   const [artistRevealed, setArtistRevealed] = useState(false);
+  const [skipTransition, setSkipTransition] = useState(false);
 
   // Audio state
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('none');
@@ -227,16 +228,20 @@ export default function PlaylistPage() {
 
   const goToIndex = async (index: number) => {
     const track = tracks[index];
+    setSkipTransition(true);
     setCurrentIndex(index);
     resetReveals();
+    requestAnimationFrame(() => setSkipTransition(false));
     playTrack(track);
   };
 
   const handleShuffle = async () => {
     const s = shuffled(tracks);
+    setSkipTransition(true);
     setTracks(s);
     setCurrentIndex(0);
     resetReveals();
+    requestAnimationFrame(() => setSkipTransition(false));
     playTrack(s[0]);
   };
 
@@ -359,7 +364,7 @@ export default function PlaylistPage() {
   // ── Game phase ────────────────────────────────────────────────────────────
   return (
     <div className="playlist-page">
-      <div className="playlist-card">
+      <div className={`playlist-card${skipTransition ? ' no-transition' : ''}`}>
         <Header
           subtitle={playlistName}
           backLabel="Playlists"

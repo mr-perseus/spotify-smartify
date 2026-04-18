@@ -210,15 +210,36 @@ public class PlaylistService {
         while (all.size() < maxResults) {
             P page = spotifyGet(urlBuilder.apply(offset), token, pageType, context);
             List<I> items = (page != null) ? itemsExtractor.apply(page) : null;
-            if (items == null) break;
-            for (I item : items) {
-                R mapped = mapper.apply(item);
-                if (mapped != null) all.add(mapped);
+            if (items == null) {
+                break;
             }
-            if (nextExtractor.apply(page) == null) break;
+
+            addMappedItems(all, items, mapper, maxResults);
+
+            if (!shouldContinuePagination(all.size(), maxResults, nextExtractor.apply(page))) {
+                break;
+            }
+
             offset += PAGE_LIMIT;
         }
         return all;
+    }
+
+    private <I, R> void addMappedItems(List<R> results, List<I> items, Function<I, R> mapper, int maxResults) {
+        for (I item : items) {
+            if (results.size() >= maxResults) {
+                return;
+            }
+
+            R mapped = mapper.apply(item);
+            if (mapped != null) {
+                results.add(mapped);
+            }
+        }
+    }
+
+    private boolean shouldContinuePagination(int currentSize, int maxResults, String nextPage) {
+        return currentSize < maxResults && nextPage != null;
     }
 
     // --- Spotify API response DTOs ---

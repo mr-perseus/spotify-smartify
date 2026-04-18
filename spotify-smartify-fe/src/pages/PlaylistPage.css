@@ -408,6 +408,13 @@
   user-select: none;
 }
 
+/* Disable filter transitions during track changes to prevent flash of unblurred content */
+.no-transition .game-art,
+.no-transition .game-track-name,
+.no-transition .game-track-artist {
+  transition: none !important;
+}
+
 .game-eye-btn {
   display: flex;
   align-items: center;
