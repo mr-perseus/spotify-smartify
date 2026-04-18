@@ -1,0 +1,264 @@
+' ============================================================================
+' Spotify Smartify — Architecture Diagrams
+' ============================================================================
+' Four diagrams in one file:
+'   0. High-Level Overview (3-box diagram with tech icons)
+'   1. System Architecture (component overview)
+'   2. OAuth Authentication Flow (sequence)
+'   3. Frontend Navigation (state diagram)
+'
+' Render with:  plantuml docs/architecture.puml
+' Produces:     docs/architecture_001.png  (overview)
+'               docs/architecture_002.png  (components)
+'               docs/architecture_003.png  (auth flow)
+'               docs/architecture_004.png  (navigation)
+' ============================================================================
+
+
+' ────────────────────────────────────────────────────────────────────────────
+' 0. HIGH-LEVEL OVERVIEW
+' ────────────────────────────────────────────────────────────────────────────
+@startuml high-level-overview
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI"
+skinparam rectangleBorderColor #888888
+skinparam arrowThickness 1.5
+
+!include <logos/react>
+!include <logos/spring-icon>
+!include <logos/java>
+!include <logos/spotify-icon>
+
+title **Spotify Smartify — High-Level Overview**
+
+rectangle "<$react{scale=0.6}>\n**React Frontend**\n127.0.0.1:3000\n\nSingle-page app\nTypeScript + React Router" as FE #FFF3E0
+
+rectangle "<$spring-icon{scale=0.6}>  <$java{scale=0.4}>\n**Spring Boot Backend**\n127.0.0.1:8080\n\nREST API\nOAuth token management" as BE #E3F2FD
+
+rectangle "<$spotify-icon{scale=0.6}>\n**Spotify**\n\nWeb API (api.spotify.com)\nWeb Playback SDK (sdk.scdn.co)" as SP #E8F5E9
+
+FE -right-> BE : " **REST**\n Bearer token auth"
+BE -right-> SP : " **REST**\n Bearer token auth"
+
+BE .left.> FE  : " **HTTP 302 Redirect**\n OAuth callback with tokens"
+FE ..> SP      : " **Browser Redirect**\n to /authorize (login)"
+FE --> SP      : " **Web Playback SDK**\n Audio streaming to browser"
+
+@enduml
+
+
+' ────────────────────────────────────────────────────────────────────────────
+' 1. SYSTEM ARCHITECTURE
+' ────────────────────────────────────────────────────────────────────────────
+@startuml system-architecture
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI"
+skinparam rectangleBorderColor #888888
+skinparam componentStyle rectangle
+
+title **Spotify Smartify — System Architecture**
+
+' ── External: Spotify ──────────────────────────────────────────────────────
+rectangle "Spotify (External)" as spotify_boundary #E8F5E9 {
+  component "**Spotify Web API**\napi.spotify.com" as SpotifyAPI {
+    portin " " as sp_in
+  }
+  note right of SpotifyAPI
+    /authorize
+    /api/token
+    /v1/me
+    /v1/me/top/tracks
+    /v1/playlists/{id}/items
+    /v1/me/player
+  end note
+
+  component "**Web Playback SDK**\nsdk.scdn.co/spotify-player.js" as SDK
+}
+
+' ── Backend ────────────────────────────────────────────────────────────────
+rectangle "Spring Boot Backend\n127.0.0.1:8080" as be_boundary #E3F2FD {
+
+  component "**AuthController**\nGET  /auth/login\nGET  /auth/callback\nPOST /auth/refresh" as AuthCtrl
+
+  component "**UserController**\nGET /user/profile\nGET /user/top-tracks" as UserCtrl
+
+  component "**PlaylistController**\nGET /playlist/{playlistId}/tracks" as PlayCtrl
+
+  component "**AuthService**\nOAuth flow\nToken exchange & refresh" as AuthSvc
+
+  component "**UserService**\nProfile & top tracks\n(Spotify Java lib)" as UserSvc
+
+  component "**PlaylistService**\nDirect RestTemplate\nto Spotify /items" as PlaySvc
+
+  component "**SpotifyApiFactory**\nPer-request SpotifyApi\ninstances" as Factory
+
+  component "**WebConfig**\nCORS → :3000\nRestTemplate bean" as WebCfg
+
+  component "**GlobalExceptionHandler**\n401 / 403 / 404 / 429 / 500" as ErrHandler
+
+  AuthCtrl  -down-> AuthSvc
+  UserCtrl  -down-> UserSvc
+  PlayCtrl  -down-> PlaySvc
+  AuthSvc   -down-> Factory
+  UserSvc   -down-> Factory
+  PlaySvc  -[hidden]down-> WebCfg
+  ErrHandler -[hidden]right-> WebCfg
+}
+
+' ── Frontend ───────────────────────────────────────────────────────────────
+rectangle "React Frontend\n127.0.0.1:3000" as fe_boundary #FFF3E0 {
+
+  rectangle "Pages" as pages {
+    component "LoginPage\n/" as Login
+    component "CallbackPage\n/callback" as Callback
+    component "DashboardPage\n/dashboard" as Dashboard
+    component "ProfilePage\n/profile" as Profile
+    component "PlaylistPage\n/playlist" as Playlist
+  }
+
+  rectangle "Hooks & Services" as hooks {
+    component "**useAuthenticatedApi**\nauto 401→refresh→retry" as AuthHook
+    component "**useSpotifyPlayer**\nSDK init, play/pause\ntransfer playback" as PlayerHook
+    component "**AuthContext**\ntokens in localStorage" as AuthCtx
+    component "**authApi / userApi**\nHTTP client helpers" as APIs
+  }
+
+  pages -down-> hooks : uses
+}
+
+' ── Connections ────────────────────────────────────────────────────────────
+
+' FE ↔ BE
+fe_boundary -right-> be_boundary : "HTTP / JSON\n(CORS)"
+
+' BE → Spotify
+AuthSvc  -up-> SpotifyAPI   : "OAuth\nexchange & refresh"
+UserSvc  -up-> SpotifyAPI   : "Bearer token\nprofile & tracks"
+PlaySvc  -up-> SpotifyAPI   : "Bearer token\nplaylist items"
+
+' BE → FE (redirect)
+AuthCtrl .left.> Callback    : "302 redirect\nwith tokens"
+
+' FE → Spotify (login redirect)
+Login   ..> SpotifyAPI       : "Browser redirect\nto /authorize"
+
+' FE → SDK (audio streaming)
+PlayerHook -up-> SDK          : "Audio streaming\nvia SDK"
+
+@enduml
+
+
+' ────────────────────────────────────────────────────────────────────────────
+' 2. AUTHENTICATION FLOW
+' ────────────────────────────────────────────────────────────────────────────
+@startuml auth-flow
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI"
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceParticipantBorderColor #555555
+
+title **Spotify Smartify — OAuth Authentication Flow**
+
+actor       "User"           as User
+participant "React Frontend\n:3000"   as FE    #FFF3E0
+participant "Spring Boot BE\n:8080"   as BE    #E3F2FD
+participant "Spotify API"             as Spotify #E8F5E9
+
+== Login ==
+
+User -> FE : Click "Login with Spotify"
+FE   -> BE : GET /auth/login
+BE  --> FE : { url: "https://accounts.spotify.com/authorize?..." }
+FE   -> User : Redirect browser to Spotify
+
+User -> Spotify : Grant access
+Spotify -> BE   : GET /auth/callback?code=ABC123
+
+BE   -> Spotify : POST /api/token\n(exchange code for tokens)
+Spotify --> BE  : { access_token, refresh_token, expires_in }
+
+BE   -> FE      : **302 redirect** to\n/callback?accessToken=...&refreshToken=...&expiresIn=...
+
+FE   -> FE      : CallbackPage saves tokens\nto localStorage
+FE   -> User    : Navigate to /dashboard
+
+== Authenticated API Call ==
+
+User -> FE      : Open Top Tracks
+FE   -> BE      : GET /user/top-tracks\nAuthorization: Bearer <token>
+BE   -> Spotify : GET /v1/me/top/tracks\nAuthorization: Bearer <token>
+Spotify --> BE  : { items: [...] }
+BE  --> FE      : { tracks: [...] }
+FE  --> User    : Render track list
+
+== Token Refresh (on 401) ==
+
+FE   -> BE      : GET /user/top-tracks\nAuthorization: Bearer <expired_token>
+BE  --> FE      : 401 Unauthorized
+
+FE   -> BE      : POST /auth/refresh\n{ refreshToken }
+BE   -> Spotify : POST /api/token\n(grant_type=refresh_token)
+Spotify --> BE  : { access_token, expires_in }
+BE  --> FE      : { accessToken, expiresIn }
+
+FE   -> FE      : Update localStorage
+FE   -> BE      : **Retry** GET /user/top-tracks\nAuthorization: Bearer <new_token>
+BE  --> FE      : { tracks: [...] }
+
+@enduml
+
+
+' ────────────────────────────────────────────────────────────────────────────
+' 3. FRONTEND NAVIGATION
+' ────────────────────────────────────────────────────────────────────────────
+@startuml navigation
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI"
+skinparam stateBorderColor #555555
+
+title **Spotify Smartify — Frontend Page Navigation**
+
+state "**LoginPage**\n/" as Login #FFF3E0
+state "**CallbackPage**\n/callback" as Callback #FFF3E0
+state "**DashboardPage**\n/dashboard" as Dashboard #FFE0B2
+state "**ProfilePage**\n/profile\n(Top Tracks)" as Profile #FFF3E0
+state "**PlaylistPage**\n/playlist\n(Playlist Quiz)" as Playlist #FFF3E0
+
+[*] --> Login
+
+Login --> Callback            : Spotify OAuth\nredirect via BE
+Callback --> Dashboard        : Save tokens\nnavigate
+
+Login -[dashed]-> Dashboard   : Already authenticated\n(auto-redirect)
+
+Dashboard --> Profile         : "Top Tracks" card
+Dashboard --> Playlist        : "Playlist Quiz" card
+
+Profile --> Dashboard         : Back button
+Playlist --> Dashboard        : Back button
+
+note right of Dashboard
+  Central hub after login.
+  Shows feature cards and
+  user greeting.
+end note
+
+note bottom of Profile
+  Username form,
+  time range selector,
+  top 50 tracks with
+  audio preview.
+end note
+
+note bottom of Playlist
+  Paste playlist URL,
+  shuffled tracks with
+  blurred art/title/artist
+  reveals, SDK playback.
+end note
+
+@enduml

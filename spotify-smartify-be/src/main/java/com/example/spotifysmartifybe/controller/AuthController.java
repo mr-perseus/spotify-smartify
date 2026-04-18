@@ -13,7 +13,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 import se.michaelthelin.spotify.exceptions.detailed.TooManyRequestsException;
+import se.michaelthelin.spotify.exceptions.detailed.UnauthorizedException;
 import se.michaelthelin.spotify.model_objects.credentials.AuthorizationCodeCredentials;
 
 import java.net.URI;
@@ -60,27 +62,31 @@ public class AuthController {
             @RequestParam(required = false) String error) {
 
         if (error != null || code == null) {
-            return redirectToFrontend("/?error=" + (error != null ? error : "missing_code"));
+            return redirectToFrontend(UriComponentsBuilder.fromPath("/")
+                    .queryParam("error", error != null ? error : "missing_code")
+                    .toUriString());
         }
 
         try {
             AuthorizationCodeCredentials credentials = authService.exchangeCode(code);
 
-            if (!allowedSpotifyIds.isEmpty()) {
-                String spotifyId = userService.getCurrentUserProfile(credentials.getAccessToken()).getId();
-                if (!allowedSpotifyIds.contains(spotifyId)) {
-                    return redirectToFrontend("/?error=access_denied");
-                }
+            if (!isUserAllowed(credentials.getAccessToken())) {
+                    return redirectToFrontend(UriComponentsBuilder.fromPath("/")
+                            .queryParam("error", "access_denied")
+                            .toUriString());
             }
 
-            return redirectToFrontend("/callback"
-                    + "?accessToken=" + credentials.getAccessToken()
-                    + "&refreshToken=" + credentials.getRefreshToken()
-                    + "&expiresIn=" + credentials.getExpiresIn());
+            return redirectToFrontend(UriComponentsBuilder.fromPath("/callback")
+                    .queryParam("accessToken", credentials.getAccessToken())
+                    .queryParam("refreshToken", credentials.getRefreshToken())
+                    .queryParam("expiresIn", credentials.getExpiresIn())
+                    .toUriString());
 
         } catch (Exception e) {
             log.error("Error during OAuth callback: {}", e.getMessage(), e);
-            return redirectToFrontend("/?error=exchange_failed");
+            return redirectToFrontend(UriComponentsBuilder.fromPath("/")
+                    .queryParam("error", "exchange_failed")
+                    .toUriString());
         }
     }
 
@@ -102,5 +108,13 @@ public class AuthController {
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(frontendUrl + path));
         return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
+    }
+
+    private boolean isUserAllowed(String accessToken) throws UnauthorizedException, TooManyRequestsException {
+        if (allowedSpotifyIds.isEmpty()) {
+            return true;
+        }
+        String spotifyId = userService.getCurrentUserProfile(accessToken).getId();
+        return allowedSpotifyIds.contains(spotifyId);
     }
 }

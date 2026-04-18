@@ -12,6 +12,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +46,10 @@ public class PlaylistService {
     }
 
     private String fetchPlaylistName(String accessToken, String playlistId) {
-        String url = SPOTIFY_API_BASE + "/playlists/" + playlistId + "?fields=name";
+        String url = UriComponentsBuilder.fromUriString(SPOTIFY_API_BASE)
+                .pathSegment("playlists", playlistId)
+                .queryParam("fields", "name")
+                .toUriString();
 
         try {
             ResponseEntity<SpotifyPlaylistMeta> response = restTemplate.exchange(
@@ -75,15 +79,7 @@ public class PlaylistService {
         int offset = 0;
 
         while (allTracks.size() < MAX_TRACKS) {
-            String url = SPOTIFY_API_BASE + "/playlists/" + playlistId
-                    + "/items?limit=" + PAGE_LIMIT
-                    + "&offset=" + offset
-                    + "&additional_types=track";
-
-            ResponseEntity<SpotifyPagingResponse> response = restTemplate.exchange(
-                    url, HttpMethod.GET, authEntity(token), SpotifyPagingResponse.class);
-
-            SpotifyPagingResponse page = response.getBody();
+            SpotifyPagingResponse page = fetchPlaylistItemsPage(token, playlistId, offset);
             if (page == null || page.items() == null) {
                 break;
             }
@@ -108,6 +104,32 @@ public class PlaylistService {
 
         log.info("Fetched {} tracks from playlist {}", allTracks.size(), playlistId);
         return allTracks;
+    }
+
+    private SpotifyPagingResponse fetchPlaylistItemsPage(String token, String playlistId, int offset) {
+        String url = UriComponentsBuilder.fromUriString(SPOTIFY_API_BASE)
+                .pathSegment("playlists", playlistId, "items")
+                .queryParam("limit", PAGE_LIMIT)
+                .queryParam("offset", offset)
+                .queryParam("additional_types", "track")
+                .toUriString();
+
+        try {
+            ResponseEntity<SpotifyPagingResponse> response = restTemplate.exchange(
+                    url, HttpMethod.GET, authEntity(token), SpotifyPagingResponse.class);
+            return response.getBody();
+        } catch (HttpClientErrorException.NotFound e) {
+            log.error("Playlist not found: {}", playlistId, e);
+            throw new SpotifyApiException("Playlist not found: " + playlistId);
+        } catch (HttpClientErrorException.Unauthorized e) {
+            log.error("Access token expired or invalid for playlist: {}", playlistId, e);
+            throw new SpotifyApiException("Access token expired or invalid");
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            throw e; // handled by GlobalExceptionHandler
+        } catch (HttpClientErrorException e) {
+            log.error("Failed to fetch playlist items for {}: {}", playlistId, e.getStatusCode(), e);
+            throw new SpotifyApiException("Failed to fetch playlist items: " + e.getStatusCode());
+        }
     }
 
     private TrackResponse toTrackResponse(SpotifyTrack track) {
