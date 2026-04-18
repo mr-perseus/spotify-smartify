@@ -82,11 +82,152 @@
 }
 
 .pl-label {
+  margin: 0;
   color: #b3b3b3;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* ── Browse playlists ──────────────────────────────────── */
+.pl-browse-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pl-browse-loading,
+.pl-browse-empty {
+  margin: 0;
+  color: #777;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.pl-browse-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Thin scrollbar */
+.pl-browse-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pl-browse-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pl-browse-list::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+.pl-browse-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+}
+
+.pl-browse-item:hover:not(:disabled) {
+  background: #282828;
+  border-color: #333;
+}
+
+.pl-browse-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pl-browse-img {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.pl-browse-img-placeholder {
+  background: #282828;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b3b3b3;
+}
+
+.pl-browse-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pl-browse-name {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pl-browse-meta {
+  color: #777;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pl-collab-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: 50px;
+  background: rgba(29, 185, 84, 0.15);
+  color: #1db954;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Divider ───────────────────────────────────────────── */
+.pl-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pl-divider::before,
+.pl-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #333;
+}
+
+.pl-divider-text {
+  color: #555;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 .pl-input-row {

@@ -1,6 +1,7 @@
 package com.example.spotifysmartifybe.service;
 
 import com.example.spotifysmartifybe.dto.PlaylistResponse;
+import com.example.spotifysmartifybe.dto.PlaylistSummary;
 import com.example.spotifysmartifybe.dto.TrackResponse;
 import com.example.spotifysmartifybe.exception.SpotifyApiException;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -28,6 +29,7 @@ public class PlaylistService {
     private static final String SPOTIFY_API_BASE = "https://api.spotify.com/v1";
     private static final int PAGE_LIMIT = 50;
     private static final int MAX_TRACKS = 500;
+    private static final int MAX_PLAYLISTS = 1000;
 
     private final RestTemplate restTemplate;
 
@@ -43,6 +45,43 @@ public class PlaylistService {
                     "This playlist is not accessible. Spotify's Dev Mode only allows access " +
                     "to playlists you own or collaborate on.");
         }
+    }
+
+    public List<PlaylistSummary> getUserPlaylists(String accessToken) {
+        List<PlaylistSummary> all = new ArrayList<>();
+        int offset = 0;
+
+        while (all.size() < MAX_PLAYLISTS) {
+            String url = UriComponentsBuilder.fromUriString(SPOTIFY_API_BASE)
+                    .pathSegment("me", "playlists")
+                    .queryParam("limit", PAGE_LIMIT)
+                    .queryParam("offset", offset)
+                    .toUriString();
+
+            SpotifyPlaylistListResponse page = spotifyGet(url, accessToken,
+                    SpotifyPlaylistListResponse.class, "user playlists");
+            if (page == null || page.items() == null) {
+                break;
+            }
+
+            for (SpotifySimplifiedPlaylist sp : page.items()) {
+                String imageUrl = (sp.images() != null && !sp.images().isEmpty())
+                        ? sp.images().getFirst().url() : null;
+                int trackCount = (sp.items() != null) ? sp.items().total() : 0;
+                String ownerName = (sp.owner() != null && sp.owner().displayName() != null)
+                        ? sp.owner().displayName() : "";
+                all.add(new PlaylistSummary(
+                        sp.id(), sp.name(), imageUrl, trackCount, ownerName, sp.collaborative()));
+            }
+
+            if (page.next() == null) {
+                break;
+            }
+            offset += PAGE_LIMIT;
+        }
+
+        log.info("Fetched {} playlists for user", all.size());
+        return all;
     }
 
     private String fetchPlaylistName(String accessToken, String playlistId) {
@@ -179,4 +218,24 @@ public class PlaylistService {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifyImage(String url) {}
+
+    // --- DTOs for GET /v1/me/playlists ---
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifyPlaylistListResponse(List<SpotifySimplifiedPlaylist> items, String next) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifySimplifiedPlaylist(
+            String id,
+            String name,
+            List<SpotifyImage> images,
+            SpotifyOwner owner,
+            boolean collaborative,
+            SpotifyPlaylistItems items) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifyOwner(@JsonProperty("display_name") String displayName) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifyPlaylistItems(int total) {}
 }

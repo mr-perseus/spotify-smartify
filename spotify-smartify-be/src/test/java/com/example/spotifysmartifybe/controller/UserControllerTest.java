@@ -1,6 +1,8 @@
 package com.example.spotifysmartifybe.controller;
 
+import com.example.spotifysmartifybe.dto.PlaylistSummary;
 import com.example.spotifysmartifybe.dto.TrackResponse;
+import com.example.spotifysmartifybe.service.PlaylistService;
 import com.example.spotifysmartifybe.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,9 @@ class UserControllerTest {
 
     @MockitoBean
     private UserService userService;
+
+    @MockitoBean
+    private PlaylistService playlistService;
 
     // --- getProfile ---
 
@@ -100,6 +105,34 @@ class UserControllerTest {
     @Test
     void getTopTracks_missingAuth_returns401() throws Exception {
         mockMvc.perform(get("/user/top-tracks"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // --- getUserPlaylists ---
+
+    @Test
+    void getUserPlaylists_success_returnsPlaylists() throws Exception {
+        List<PlaylistSummary> playlists = List.of(
+                new PlaylistSummary("p1", "My Favorites", "https://img.url/1.jpg", 42, "TestUser", false),
+                new PlaylistSummary("p2", "Road Trip Mix", null, 18, "Alice", true)
+        );
+        when(playlistService.getUserPlaylists("my-token")).thenReturn(playlists);
+
+        mockMvc.perform(get("/user/playlists")
+                        .header("Authorization", "Bearer my-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("p1"))
+                .andExpect(jsonPath("$[0].name").value("My Favorites"))
+                .andExpect(jsonPath("$[0].trackCount").value(42))
+                .andExpect(jsonPath("$[0].collaborative").value(false))
+                .andExpect(jsonPath("$[1].id").value("p2"))
+                .andExpect(jsonPath("$[1].collaborative").value(true))
+                .andExpect(jsonPath("$[1].imageUrl").isEmpty());
+    }
+
+    @Test
+    void getUserPlaylists_missingAuth_returns401() throws Exception {
+        mockMvc.perform(get("/user/playlists"))
                 .andExpect(status().isUnauthorized());
     }
 }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAuthenticatedApi } from '../hooks/useAuthenticatedApi';
 import { useSpotifyPlayer } from '../hooks/useSpotifyPlayer';
-import { TopTrack } from '../services/userApi';
+import { TopTrack, PlaylistSummary } from '../services/userApi';
 import { UnauthorizedError } from '../services/errors';
 import './PlaylistPage.css';
 
@@ -61,6 +61,11 @@ export default function PlaylistPage() {
     useCallback(() => tokens?.accessToken ?? null, [tokens]),
   );
 
+  // Browse playlists
+  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
+  const [playlistsLoading, setPlaylistsLoading] = useState(true);
+  const [playlistsError, setPlaylistsError] = useState<string | null>(null);
+
   // Input phase
   const [urlInput, setUrlInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -107,6 +112,28 @@ export default function PlaylistPage() {
     spotify.disconnect();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch user playlists on mount
+  useEffect(() => {
+    let cancelled = false;
+    setPlaylistsLoading(true);
+    api.getUserPlaylists()
+      .then(data => {
+        if (!cancelled) setPlaylists(data);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        if (err instanceof UnauthorizedError) {
+          logout();
+        } else {
+          setPlaylistsError(err.message || 'Could not load your playlists.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPlaylistsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   /**
    * Play a track. Tries Spotify SDK first, falls back to 30s preview.
    */
@@ -148,13 +175,7 @@ export default function PlaylistPage() {
       });
   }, [spotify, stopPreview]);
 
-  const handleLoad = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const playlistId = extractPlaylistId(urlInput);
-    if (!playlistId) {
-      setLoadError('Could not find a playlist ID. Paste a Spotify playlist URL or URI.');
-      return;
-    }
+  const loadPlaylistById = async (playlistId: string) => {
     await stopAll();
     setLoading(true);
     setLoadError(null);
@@ -181,6 +202,21 @@ export default function PlaylistPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLoad = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const playlistId = extractPlaylistId(urlInput);
+    if (!playlistId) {
+      setLoadError('Could not find a playlist ID. Paste a Spotify playlist URL or URI.');
+      return;
+    }
+    await loadPlaylistById(playlistId);
+  };
+
+  const handleBrowseSelect = async (playlistId: string) => {
+    if (loading) return;
+    await loadPlaylistById(playlistId);
   };
 
   const resetReveals = () => {
@@ -242,10 +278,59 @@ export default function PlaylistPage() {
             onLogout={logout}
             sdkReady={spotify.isReady}
           />
+
+          {/* Browse your playlists */}
+          <div className="pl-browse-section">
+            <p className="pl-label">Your playlists</p>
+            {playlistsLoading && (
+              <p className="pl-browse-loading">Loading your playlists...</p>
+            )}
+            {playlistsError && (
+              <p className="pl-error">{playlistsError}</p>
+            )}
+            {!playlistsLoading && !playlistsError && playlists.length === 0 && (
+              <p className="pl-browse-empty">No playlists found.</p>
+            )}
+            {!playlistsLoading && playlists.length > 0 && (
+              <div className="pl-browse-list">
+                {playlists.map(pl => (
+                  <button
+                    key={pl.id}
+                    className="pl-browse-item"
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleBrowseSelect(pl.id)}
+                  >
+                    {pl.imageUrl ? (
+                      <img className="pl-browse-img" src={pl.imageUrl} alt="" />
+                    ) : (
+                      <div className="pl-browse-img pl-browse-img-placeholder">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" opacity="0.3">
+                          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="pl-browse-info">
+                      <span className="pl-browse-name">{pl.name}</span>
+                      <span className="pl-browse-meta">
+                        {pl.trackCount} tracks · {pl.ownerName}
+                      </span>
+                    </div>
+                    {pl.collaborative && (
+                      <span className="pl-collab-badge">collab</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="pl-divider">
+            <span className="pl-divider-text">or paste a link</span>
+          </div>
+
           <form className="pl-form" onSubmit={handleLoad}>
-            <label className="pl-label" htmlFor="pl-url">
-              Paste a Spotify playlist link
-            </label>
             <div className="pl-input-row">
               <input
                 id="pl-url"

@@ -49,6 +49,15 @@ export interface PlaylistInfo {
   tracks: TopTrack[];
 }
 
+export interface PlaylistSummary {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  trackCount: number;
+  ownerName: string;
+  collaborative: boolean;
+}
+
 export const userApi = {
   getProfile: async (accessToken: string): Promise<UserProfile> => {
     return fetchOrThrow(`${API_BASE_URL}/user/profile`, accessToken);
@@ -60,5 +69,9 @@ export const userApi = {
 
   getPlaylistTracks: async (accessToken: string, playlistId: string): Promise<PlaylistInfo> => {
     return fetchOrThrow(`${API_BASE_URL}/playlist/${playlistId}/tracks`, accessToken);
+  },
+
+  getUserPlaylists: async (accessToken: string): Promise<PlaylistSummary[]> => {
+    return fetchOrThrow(`${API_BASE_URL}/user/playlists`, accessToken);
   },
 };

@@ -1,6 +1,8 @@
 package com.example.spotifysmartifybe.controller;
 
+import com.example.spotifysmartifybe.dto.PlaylistSummary;
 import com.example.spotifysmartifybe.dto.TrackResponse;
+import com.example.spotifysmartifybe.service.PlaylistService;
 import com.example.spotifysmartifybe.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,7 @@ public class UserController {
     private static final Set<String> VALID_TIME_RANGES = Set.of("short_term", "medium_term", "long_term");
 
     private final UserService userService;
+    private final PlaylistService playlistService;
 
     @GetMapping("/profile")
     public ResponseEntity<Map<String, String>> getProfile(
@@ -50,5 +53,13 @@ public class UserController {
         }
         List<TrackResponse> tracks = userService.getTopTracks(accessToken, timeRange);
         return ResponseEntity.ok(tracks);
+    }
+
+    @GetMapping("/playlists")
+    public ResponseEntity<List<PlaylistSummary>> getUserPlaylists(
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String accessToken = requireBearerToken(authHeader);
+        List<PlaylistSummary> playlists = playlistService.getUserPlaylists(accessToken);
+        return ResponseEntity.ok(playlists);
     }
 }

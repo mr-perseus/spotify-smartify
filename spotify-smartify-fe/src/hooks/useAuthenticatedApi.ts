@@ -61,5 +61,9 @@ export function useAuthenticatedApi() {
       (playlistId: string) => withRefresh(token => userApi.getPlaylistTracks(token, playlistId)),
       [withRefresh],
     ),
+    getUserPlaylists: useCallback(
+      () => withRefresh(token => userApi.getUserPlaylists(token)),
+      [withRefresh],
+    ),
   };
 }
