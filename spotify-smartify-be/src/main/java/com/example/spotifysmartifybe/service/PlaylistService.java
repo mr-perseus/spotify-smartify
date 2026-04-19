@@ -93,7 +93,7 @@ public class PlaylistService {
     private PlaylistSummary toPlaylistSummary(SpotifySimplifiedPlaylist sp) {
         String imageUrl = (sp.images() != null && !sp.images().isEmpty())
                 ? sp.images().getFirst().url() : null;
-        int trackCount = (sp.tracks() != null) ? sp.tracks().total() : 0;
+        int trackCount = (sp.items() != null) ? sp.items().total() : 0;
         String ownerName = (sp.owner() != null && sp.owner().displayName() != null)
                 ? sp.owner().displayName() : "";
         return new PlaylistSummary(sp.id(), sp.name(), imageUrl, trackCount, ownerName, sp.collaborative());
@@ -284,7 +284,7 @@ public class PlaylistService {
             List<SpotifyImage> images,
             SpotifyOwner owner,
             boolean collaborative,
-            @JsonProperty("tracks") SpotifyPlaylistItems tracks) {}
+            SpotifyPlaylistItems items) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifyOwner(String id, @JsonProperty("display_name") String displayName) {}

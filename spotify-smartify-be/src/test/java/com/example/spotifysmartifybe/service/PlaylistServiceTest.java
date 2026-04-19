@@ -307,7 +307,7 @@ class PlaylistServiceTest {
                     "id": "%s", "name": "%s", "collaborative": %s,
                     "owner": {"id": "%s", "display_name": "Owner"},
                     "images": [{"url": "https://img.test/%s.jpg"}],
-                    "tracks": {"total": 10}
+                    "items": {"total": 10}
                 }
                 """.formatted(id, name, collaborative, ownerId, id);
     }
