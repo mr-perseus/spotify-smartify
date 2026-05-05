@@ -78,6 +78,7 @@ export default function PlaylistPage() {
   const [artRevealed, setArtRevealed] = useState(false);
   const [titleRevealed, setTitleRevealed] = useState(false);
   const [artistRevealed, setArtistRevealed] = useState(false);
+  const [yearRevealed, setYearRevealed] = useState(false);
   const [skipTransition, setSkipTransition] = useState(false);
 
   // Audio state
@@ -193,6 +194,7 @@ export default function PlaylistPage() {
       setArtRevealed(false);
       setTitleRevealed(false);
       setArtistRevealed(false);
+      setYearRevealed(false);
       playTrack(s[0]);
     } catch (err: any) {
       if (err instanceof UnauthorizedError) {
@@ -224,6 +226,7 @@ export default function PlaylistPage() {
     setArtRevealed(false);
     setTitleRevealed(false);
     setArtistRevealed(false);
+    setYearRevealed(false);
   };
 
   const goToIndex = async (index: number) => {
@@ -444,6 +447,25 @@ export default function PlaylistPage() {
             {artistRevealed ? <EyeOffIcon /> : <EyeIcon />}
           </button>
         </div>
+
+        {/* Year row */}
+        {currentTrack.releaseYear && (
+          <div className="game-info-row">
+            <div className="game-info-text">
+              <p className={`game-track-year${yearRevealed ? '' : ' blurred'}`}>
+                {currentTrack.releaseYear}
+              </p>
+            </div>
+            <button
+              className={`game-eye-btn${yearRevealed ? ' active' : ''}`}
+              type="button"
+              onClick={() => setYearRevealed(r => !r)}
+              title={yearRevealed ? 'Hide year' : 'Reveal year'}
+            >
+              {yearRevealed ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          </div>
+        )}
 
         {/* Play / pause */}
         <div className="game-play-row">

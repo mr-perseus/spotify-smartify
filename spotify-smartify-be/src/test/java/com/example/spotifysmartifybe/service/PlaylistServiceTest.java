@@ -76,7 +76,7 @@ class PlaylistServiceTest {
                         "item": {
                             "id": "track-42", "name": "Great Song", "type": "track",
                             "artists": [{"name": "Alice"}, {"name": "Bob"}],
-                            "album": {"name": "Best Album", "images": [{"url": "https://img.test/cover.jpg"}]},
+                            "album": {"name": "Best Album", "images": [{"url": "https://img.test/cover.jpg"}], "release_date": "2021-06-15"},
                             "preview_url": "https://preview.test/42.mp3",
                             "external_urls": {"spotify": "https://open.spotify.com/track/track-42"}
                         }
@@ -95,6 +95,7 @@ class PlaylistServiceTest {
         assertThat(track.albumImageUrl()).isEqualTo("https://img.test/cover.jpg");
         assertThat(track.previewUrl()).isEqualTo("https://preview.test/42.mp3");
         assertThat(track.spotifyUrl()).isEqualTo("https://open.spotify.com/track/track-42");
+        assertThat(track.releaseYear()).isEqualTo("2021");
         mockServer.verify();
     }
 

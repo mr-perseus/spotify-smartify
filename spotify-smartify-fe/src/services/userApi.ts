@@ -37,6 +37,7 @@ export interface TopTrack {
   albumImageUrl: string;
   previewUrl: string;
   spotifyUrl: string;
+  releaseYear: string;
 }
 
 export interface UserProfile {

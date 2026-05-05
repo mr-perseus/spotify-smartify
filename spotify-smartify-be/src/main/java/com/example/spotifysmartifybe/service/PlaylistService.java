@@ -158,9 +158,15 @@ public class PlaylistService {
             spotifyUrl = track.externalUrls().getOrDefault("spotify", "");
         }
 
+        String releaseYear = "";
+        if (track.album() != null && track.album().releaseDate() != null
+                && track.album().releaseDate().length() >= 4) {
+            releaseYear = track.album().releaseDate().substring(0, 4);
+        }
+
         return new TrackResponse(
                 track.id(), track.name(), artistNames, albumName,
-                albumImageUrl, previewUrl, spotifyUrl);
+                albumImageUrl, previewUrl, spotifyUrl, releaseYear);
     }
 
     private <T> T spotifyGet(String url, String token, Class<T> responseType, String context) {
@@ -267,7 +273,7 @@ public class PlaylistService {
     record SpotifyArtist(String name) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record SpotifyAlbum(String name, List<SpotifyImage> images) {}
+    record SpotifyAlbum(String name, List<SpotifyImage> images, @JsonProperty("release_date") String releaseDate) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifyImage(String url) {}

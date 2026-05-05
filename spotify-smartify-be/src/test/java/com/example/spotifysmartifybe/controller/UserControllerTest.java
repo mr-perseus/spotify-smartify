@@ -83,7 +83,7 @@ class UserControllerTest {
     @Test
     void getTopTracks_success_returnsTracks() throws Exception {
         List<TrackResponse> tracks = List.of(
-                new TrackResponse("t1", "Song", "Artist", "Album", "img", "preview", "spotify")
+                new TrackResponse("t1", "Song", "Artist", "Album", "img", "preview", "spotify", "2023")
         );
         when(userService.getTopTracks("my-token", "medium_term")).thenReturn(tracks);
 

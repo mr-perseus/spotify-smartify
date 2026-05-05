@@ -31,7 +31,7 @@ class PlaylistControllerTest {
     @Test
     void getPlaylistTracks_success_returnsPlaylistResponse() throws Exception {
         PlaylistResponse response = new PlaylistResponse("My Playlist", List.of(
-                new TrackResponse("t1", "Song", "Artist", "Album", "img", "preview", "spotify")
+                new TrackResponse("t1", "Song", "Artist", "Album", "img", "preview", "spotify", "2023")
         ));
         when(playlistService.getPlaylistWithTracks("my-token", "pl123")).thenReturn(response);
 

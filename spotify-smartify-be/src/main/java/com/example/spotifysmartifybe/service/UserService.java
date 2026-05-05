@@ -86,8 +86,14 @@ public class UserService {
             spotifyUrl = track.getExternalUrls().get("spotify");
         }
 
+        String releaseYear = "";
+        if (track.getAlbum() != null && track.getAlbum().getReleaseDate() != null
+                && track.getAlbum().getReleaseDate().length() >= 4) {
+            releaseYear = track.getAlbum().getReleaseDate().substring(0, 4);
+        }
+
         return new TrackResponse(
                 track.getId(), track.getName(), artistNames, albumName,
-                albumImageUrl, previewUrl, spotifyUrl);
+                albumImageUrl, previewUrl, spotifyUrl, releaseYear);
     }
 }

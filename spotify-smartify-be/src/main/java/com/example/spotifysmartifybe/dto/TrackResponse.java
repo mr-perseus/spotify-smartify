@@ -7,5 +7,6 @@ public record TrackResponse(
         String albumName,
         String albumImageUrl,
         String previewUrl,
-        String spotifyUrl
+        String spotifyUrl,
+        String releaseYear
 ) {}

@@ -402,8 +402,19 @@
   transition: filter 0.25s ease;
 }
 
+.game-track-year {
+  margin: 0;
+  color: #b3b3b3;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: filter 0.25s ease;
+}
+
 .game-track-name.blurred,
-.game-track-artist.blurred {
+.game-track-artist.blurred,
+.game-track-year.blurred {
   filter: blur(10px);
   user-select: none;
 }
@@ -411,7 +422,8 @@
 /* Disable filter transitions during track changes to prevent flash of unblurred content */
 .no-transition .game-art,
 .no-transition .game-track-name,
-.no-transition .game-track-artist {
+.no-transition .game-track-artist,
+.no-transition .game-track-year {
   transition: none !important;
 }
 
